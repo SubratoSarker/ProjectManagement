@@ -1,5 +1,6 @@
 @page "/Dashboard"
 @attribute [TabItemOption(Text = "Dashboard")]
+@using ClosedXML.Excel
 @using ProjectManagement.Models.Dashboard
 @using ProjectManagement.Models.ProjectModel
 @using ProjectManagement.Models.Task
@@ -11,6 +12,7 @@
 @inject ITaskServices task
 @inject Blazored.SessionStorage.ISessionStorageService sess
 @inject IJSRuntime JSRuntime
+@inject ToastService Tost
 
 <PageTitle>Dashboard</PageTitle>
 <h3>Dashboard</h3>
@@ -149,7 +151,12 @@
     </div>
 </div>
 
-<div class="row">
+<div class="d-flex justify-content-end mb-2 no-print">
+    <button class="btn btn-sm btn-outline-secondary me-2" @onclick="ExportToExcel"><i class="bi bi-file-earmark-excel"></i> Export to Excel</button>
+    <button class="btn btn-sm btn-outline-secondary" @onclick="Print"><i class="bi bi-printer"></i> Print / PDF</button>
+</div>
+
+<div class="row" id="dashboardPrintArea">
     <div class="col-md-6 mb-4">
         <div class="card">
             <div class="card-header bg-secondary text-black">Project Progress</div>
@@ -343,6 +350,68 @@
             {
                 System.Console.WriteLine("[Dashboard] createBottleneckFunnel JS call failed: " + ex);
             }
+        }
+    }
+
+    private async Task Print()
+    {
+        await JSRuntime.InvokeVoidAsync("printDiv", "dashboardPrintArea");
+    }
+
+    private async Task ExportToExcel()
+    {
+        try
+        {
+            using var workbook = new XLWorkbook();
+
+            var progressSheet = workbook.Worksheets.Add("Project Progress");
+            progressSheet.Cell(1, 1).Value = "Project";
+            progressSheet.Cell(1, 2).Value = "Done";
+            progressSheet.Cell(1, 3).Value = "Total";
+            progressSheet.Cell(1, 4).Value = "Percent";
+            progressSheet.Range(1, 1, 1, 4).Style.Font.Bold = true;
+            if (ProjectProgress != null)
+            {
+                for (int i = 0; i < ProjectProgress.Count; i++)
+                {
+                    var p = ProjectProgress[i];
+                    var percent = p.TotalTasks == 0 ? 0 : (int)Math.Round(100.0 * p.DoneTasks / p.TotalTasks);
+                    progressSheet.Cell(i + 2, 1).Value = p.strProjectName;
+                    progressSheet.Cell(i + 2, 2).Value = p.DoneTasks;
+                    progressSheet.Cell(i + 2, 3).Value = p.TotalTasks;
+                    progressSheet.Cell(i + 2, 4).Value = $"{percent}%";
+                }
+            }
+            progressSheet.Columns().AdjustToContents();
+
+            var overdueSheet = workbook.Worksheets.Add("Overdue Tasks");
+            overdueSheet.Cell(1, 1).Value = "Project";
+            overdueSheet.Cell(1, 2).Value = "Task";
+            overdueSheet.Cell(1, 3).Value = "Assigned To";
+            overdueSheet.Cell(1, 4).Value = "Due";
+            overdueSheet.Cell(1, 5).Value = "Status";
+            overdueSheet.Range(1, 1, 1, 5).Style.Font.Bold = true;
+            if (Overdue != null)
+            {
+                for (int i = 0; i < Overdue.Count; i++)
+                {
+                    var o = Overdue[i];
+                    overdueSheet.Cell(i + 2, 1).Value = o.strProjectName;
+                    overdueSheet.Cell(i + 2, 2).Value = o.strTaskName;
+                    overdueSheet.Cell(i + 2, 3).Value = o.strUserName;
+                    overdueSheet.Cell(i + 2, 4).Value = o.dteDeadLine.ToString("dd MMM yyyy");
+                    overdueSheet.Cell(i + 2, 5).Value = o.strStatus;
+                }
+            }
+            overdueSheet.Columns().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            await JSRuntime.InvokeVoidAsync("downloadFile", "DashboardReport.xlsx", Convert.ToBase64String(stream.ToArray()));
+        }
+        catch (Exception ex)
+        {
+            await Tost.Error("Error", ex.Message, true);
         }
     }
 }

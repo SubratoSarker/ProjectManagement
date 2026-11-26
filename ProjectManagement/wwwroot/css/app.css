@@ -709,6 +709,25 @@ html[data-theme="rose"] .card-header {
 }
 
 /* ============================================================
+   Print / "Export to PDF" support -- window.print() with the app chrome
+   (sidebar, header, buttons, filters) hidden via .no-print, so the printed
+   page (or the browser's "Save as PDF" in the print dialog) only contains
+   the report content itself.
+   ============================================================ */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    .layout-side, .layout-header, .layout-footer, .layout-drawer {
+        display: none !important;
+    }
+    body, .card {
+        background-color: #fff !important;
+        color: #000 !important;
+    }
+}
+
+/* ============================================================
    Header search box (MainLayout)
    ============================================================ */
 .header-search {

@@ -1,0 +1,196 @@
+@page "/RecurringTasks"
+@attribute [TabItemOption(Text = "Recurring Tasks")]
+@using ProjectManagement.Models.Task
+@using ProjectManagement.Services.Session
+@using ProjectManagement.Services.TaskM
+@inject ITaskServices task
+@inject Blazored.SessionStorage.ISessionStorageService sess
+@inject ToastService Tost
+
+<PageTitle>Recurring Tasks</PageTitle>
+<h3>Recurring Tasks</h3>
+<p class="text-muted">Set up a task that automatically recreates itself on a schedule -- no need to remember to add it by hand every time.</p>
+
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-black">New Recurring Task</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Task Name</label>
+                <input class="form-control" @bind="newName" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Project</label>
+                <select class="form-select" @bind="newProjectId">
+                    <option value="0">-- select a project --</option>
+                    @if (Projects != null)
+                    {
+                        @foreach (var p in Projects.Where(p => p.intProjectID != 0))
+                        {
+                            <option value="@p.intProjectID">@p.strProjectName</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Assign to</label>
+                <select class="form-select" @bind="newAssignTo">
+                    <option value="0">-- select a user --</option>
+                    <option value="@session.UserID">Myself</option>
+                    @if (Teammates != null)
+                    {
+                        @foreach (var t in Teammates)
+                        {
+                            <option value="@t.intUserID">@t.strUserName</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Description</label>
+                <input class="form-control" @bind="newDescription" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Recurrence</label>
+                <select class="form-select" @bind="newRecurrence">
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Monthly">Monthly</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Priority</label>
+                <select class="form-select" @bind="newPriroty">
+                    <option value="1">Low</option>
+                    <option value="2">Medium</option>
+                    <option value="3">High</option>
+                    <option value="4">Critical</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Starting</label>
+                <input type="date" class="form-control" @bind="newStartDate" />
+            </div>
+        </div>
+        <button class="btn btn-primary mt-3" @onclick="CreateRecurring"><i class="bi bi-plus"></i> Create</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-secondary text-black">Existing Templates <span>@(Templates != null ? $"({Templates.Count()})" : "(0)")</span></div>
+    <div class="card-body">
+        @if (Templates == null || !Templates.Any())
+        {
+            <p class="text-muted">No recurring tasks set up yet.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-striped">
+                    <thead class="table-light text-center">
+                        <tr>
+                            <th>Task Name</th>
+                            <th>Project</th>
+                            <th>Assigned To</th>
+                            <th>Recurrence</th>
+                            <th>Next Run</th>
+                            <th>Active</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in Templates)
+                        {
+                            <tr class="@(t.isActive ? "" : "text-muted")">
+                                <td>@t.strTaskName</td>
+                                <td>@t.strProjectName</td>
+                                <td>@t.strUserName</td>
+                                <td>@t.strRecurrence</td>
+                                <td>@t.dteNextRun.ToString("dd MMM yyyy")</td>
+                                <td class="text-center">
+                                    <div class="form-check form-switch d-flex justify-content-center">
+                                        <input class="form-check-input" type="checkbox" checked="@t.isActive" @onchange="() => ToggleRecurring(t.intRecurringID)" />
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRecurring(t.intRecurringID)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private SessionServices session = new SessionServices();
+    private List<ProjectPerUser> Projects;
+    private List<Teammate> Teammates;
+    private List<RecurringTask> Templates;
+
+    private string newName = string.Empty;
+    private string newDescription = string.Empty;
+    private int newProjectId;
+    private int newAssignTo;
+    private string newRecurrence = "Daily";
+    private int newPriroty = 2;
+    private DateOnly newStartDate = DateOnly.FromDateTime(DateTime.Today);
+
+    protected override async Task OnInitializedAsync()
+    {
+        session = await sess.GetItemAsync<SessionServices>("session");
+        if (session != null)
+        {
+            Projects = await task.GetProjectByUser(session.UserID, 0);
+            Teammates = await task.GetTeammates(session.UserID);
+            Templates = await task.GetRecurringTasks(session.UserID);
+        }
+    }
+
+    private async Task CreateRecurring()
+    {
+        if (string.IsNullOrWhiteSpace(newName) || newProjectId <= 0 || newAssignTo <= 0)
+        {
+            await Tost.Warning("Warning", "Task name, project, and assignee are required.", true);
+            return;
+        }
+        string output = await task.CreateRecurringTask(newName, newDescription, newPriroty, newProjectId, newAssignTo, newRecurrence, newStartDate, session.UserID);
+        if (output != null && output.Contains("Success"))
+        {
+            await Tost.Success("Success", output, true);
+            newName = string.Empty;
+            newDescription = string.Empty;
+            newProjectId = 0;
+            newAssignTo = 0;
+            Templates = await task.GetRecurringTasks(session.UserID);
+        }
+        else
+        {
+            await Tost.Error("Error", output ?? "Could not create recurring task.", true);
+        }
+    }
+
+    private async Task ToggleRecurring(int id)
+    {
+        string output = await task.ToggleRecurringTask(id, session.UserID);
+        if (output == null || !output.Contains("Success"))
+        {
+            await Tost.Error("Error", output ?? "Could not update.", true);
+        }
+        Templates = await task.GetRecurringTasks(session.UserID);
+    }
+
+    private async Task DeleteRecurring(int id)
+    {
+        string output = await task.DeleteRecurringTask(id, session.UserID);
+        if (output == null || !output.Contains("Success"))
+        {
+            await Tost.Error("Error", output ?? "Could not delete.", true);
+        }
+        Templates = await task.GetRecurringTasks(session.UserID);
+    }
+}

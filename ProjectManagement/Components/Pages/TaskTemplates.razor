@@ -1,0 +1,216 @@
+@page "/TaskTemplates"
+@attribute [TabItemOption(Text = "Task Templates")]
+@using ProjectManagement.Models.Task
+@using ProjectManagement.Services.Session
+@using ProjectManagement.Services.TaskM
+@inject ITaskServices task
+@inject Blazored.SessionStorage.ISessionStorageService sess
+@inject ToastService Tost
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Task Templates</PageTitle>
+<h3>Task Templates</h3>
+<p class="text-muted">Save a reusable shape for a task you create often -- name, description, priority and a step checklist -- then apply it in one click.</p>
+
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-black">New Template</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Template Name</label>
+                <input class="form-control" placeholder="e.g. Monthly Report" @bind="newName" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Default Task Title</label>
+                <input class="form-control" @bind="newTaskName" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Priority</label>
+                <select class="form-select" @bind="newPriroty">
+                    <option value="1">Low</option>
+                    <option value="2">Medium</option>
+                    <option value="3">High</option>
+                    <option value="4">Critical</option>
+                </select>
+            </div>
+            <div class="col-md-12">
+                <label class="form-label">Description</label>
+                <input class="form-control" @bind="newDescription" />
+            </div>
+            <div class="col-md-12">
+                <label class="form-label">Steps (one per line)</label>
+                <textarea class="form-control" rows="4" @bind="newSteps"></textarea>
+            </div>
+        </div>
+        <button class="btn btn-primary mt-3" @onclick="CreateTemplate"><i class="bi bi-plus"></i> Save Template</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-secondary text-black">Saved Templates <span>@(Templates != null ? $"({Templates.Count()})" : "(0)")</span></div>
+    <div class="card-body">
+        @if (Templates == null || !Templates.Any())
+        {
+            <p class="text-muted">No templates saved yet.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-striped">
+                    <thead class="table-light text-center">
+                        <tr>
+                            <th>Template</th>
+                            <th>Task Title</th>
+                            <th>Steps</th>
+                            <th>Created</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in Templates)
+                        {
+                            <tr>
+                                <td>@t.strName</td>
+                                <td>@t.strTaskName</td>
+                                <td class="text-center">@t.StepCount</td>
+                                <td>@t.dteCreated.ToString("dd MMM yyyy")</td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => OpenApply(t)">
+                                        <i class="bi bi-magic"></i> Apply
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTemplate(t.intTemplateID)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (ApplyTarget != null)
+{
+    <div class="modal fade show" style="display:block; background-color: rgba(0,0,0,.5);" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Apply "@ApplyTarget.strName"</h5>
+                    <button type="button" class="btn-close" @onclick="() => ApplyTarget = null"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Project</label>
+                        <select class="form-select" @bind="applyProjectId">
+                            <option value="0">-- select a project --</option>
+                            @if (Projects != null)
+                            {
+                                @foreach (var p in Projects.Where(p => p.intProjectID != 0))
+                                {
+                                    <option value="@p.intProjectID">@p.strProjectName</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Deadline</label>
+                        <input type="date" class="form-control" @bind="applyDeadline" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => ApplyTarget = null">Cancel</button>
+                    <button class="btn btn-primary" @onclick="ConfirmApply">Create Task</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private SessionServices session = new SessionServices();
+    private List<ProjectPerUser> Projects;
+    private List<TaskTemplate> Templates;
+
+    private string newName = string.Empty;
+    private string newTaskName = string.Empty;
+    private string newDescription = string.Empty;
+    private string newSteps = string.Empty;
+    private int newPriroty = 2;
+
+    private TaskTemplate ApplyTarget;
+    private int applyProjectId;
+    private DateOnly applyDeadline = DateOnly.FromDateTime(DateTime.Today.AddDays(7));
+
+    protected override async Task OnInitializedAsync()
+    {
+        session = await sess.GetItemAsync<SessionServices>("session");
+        if (session != null)
+        {
+            Projects = await task.GetProjectByUser(session.UserID, 0);
+            Templates = await task.GetTaskTemplates(session.UserID);
+        }
+    }
+
+    private async Task CreateTemplate()
+    {
+        if (string.IsNullOrWhiteSpace(newName) || string.IsNullOrWhiteSpace(newTaskName))
+        {
+            await Tost.Warning("Warning", "Template name and task title are required.", true);
+            return;
+        }
+        var stepsPiped = string.Join("|", (newSteps ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        string output = await task.CreateTaskTemplate(newName, newTaskName, newDescription, newPriroty, stepsPiped, session.UserID);
+        if (output != null && output.Contains("Success"))
+        {
+            await Tost.Success("Success", output, true);
+            newName = string.Empty;
+            newTaskName = string.Empty;
+            newDescription = string.Empty;
+            newSteps = string.Empty;
+            Templates = await task.GetTaskTemplates(session.UserID);
+        }
+        else
+        {
+            await Tost.Error("Error", output ?? "Could not create template.", true);
+        }
+    }
+
+    private void OpenApply(TaskTemplate t)
+    {
+        ApplyTarget = t;
+        applyProjectId = 0;
+        applyDeadline = DateOnly.FromDateTime(DateTime.Today.AddDays(7));
+    }
+
+    private async Task ConfirmApply()
+    {
+        if (ApplyTarget == null) { return; }
+        if (applyProjectId <= 0)
+        {
+            await Tost.Warning("Warning", "Pick a project.", true);
+            return;
+        }
+        string output = await task.ApplyTaskTemplate(ApplyTarget.intTemplateID, applyProjectId, applyDeadline, session.UserID);
+        if (output != null && output.Contains("Success"))
+        {
+            await Tost.Success("Success", output, true);
+            ApplyTarget = null;
+        }
+        else
+        {
+            await Tost.Error("Error", output ?? "Could not create task.", true);
+        }
+    }
+
+    private async Task DeleteTemplate(int id)
+    {
+        string output = await task.DeleteTaskTemplate(id, session.UserID);
+        if (output == null || !output.Contains("Success"))
+        {
+            await Tost.Error("Error", output ?? "Could not delete.", true);
+        }
+        Templates = await task.GetTaskTemplates(session.UserID);
+    }
+}

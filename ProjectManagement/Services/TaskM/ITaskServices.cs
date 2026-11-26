@@ -56,5 +56,19 @@ namespace ProjectManagement.Services.TaskM
 
         // Teammates (for tagging "@Name" mentions in comments)
         Task<List<Teammate>> GetTeammates(int Enroll);
+
+        // Recurring tasks
+        Task<string> CreateRecurringTask(string Name, string Description, int Priroty, int ProjectID, int AssignTo, string Recurrence, DateOnly StartDate, int Enroll);
+        Task<List<RecurringTask>> GetRecurringTasks(int Enroll);
+        Task<string> ToggleRecurringTask(int RecurringID, int Enroll);
+        Task<string> DeleteRecurringTask(int RecurringID, int Enroll);
+        Task<int> ProcessDueRecurring(int Enroll);
+
+        // Task templates
+        Task<string> CreateTaskTemplate(string Name, string TaskName, string Description, int Priroty, string StepsPipeDelimited, int Enroll);
+        Task<List<TaskTemplate>> GetTaskTemplates(int Enroll);
+        Task<List<TemplateStep>> GetTemplateSteps(int TemplateID);
+        Task<string> DeleteTaskTemplate(int TemplateID, int Enroll);
+        Task<string> ApplyTaskTemplate(int TemplateID, int ProjectID, DateOnly DeadLine, int Enroll);
     }
 }

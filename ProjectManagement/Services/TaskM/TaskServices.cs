@@ -7,11 +7,16 @@ using ProjectManagement.Services.Session;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 namespace ProjectManagement.Services.TaskM
 {
     public class TaskServices : ITaskServices
     {
+        // The API's [ApiController] JSON serializer camelCases property names (StepCount ->
+        // stepCount), and GetFromJsonAsync defaults to case-sensitive -- needed for TaskTemplate.
+        private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
         private readonly HttpClient _httpClient;
         private readonly ISessionStorageService _sessionStorageService;
         public TaskServices(HttpClient httpClient, ISessionStorageService sessionStorageService)
@@ -575,6 +580,150 @@ namespace ProjectManagement.Services.TaskM
             {
                 await SetAuthorizationHeader();
                 return await _httpClient.GetFromJsonAsync<List<Teammate>>($"api/Task/GetTeammates?Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        // ---- Recurring tasks ----
+        public async Task<string> CreateRecurringTask(string Name, string Description, int Priroty, int ProjectID, int AssignTo, string Recurrence, DateOnly StartDate, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<string>(
+                    $"api/Task/CreateRecurringTask?Name={Uri.EscapeDataString(Name)}&Description={Uri.EscapeDataString(Description ?? "")}&Priroty={Priroty}&ProjectID={ProjectID}&AssignTo={AssignTo}&Recurrence={Recurrence}&StartDate={StartDate:yyyy-MM-dd}&Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<List<RecurringTask>> GetRecurringTasks(int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<List<RecurringTask>>($"api/Task/GetRecurringTasks?Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<string> ToggleRecurringTask(int RecurringID, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<string>($"api/Task/ToggleRecurringTask?RecurringID={RecurringID}&Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<string> DeleteRecurringTask(int RecurringID, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<string>($"api/Task/DeleteRecurringTask?RecurringID={RecurringID}&Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<int> ProcessDueRecurring(int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<int>($"api/Task/ProcessDueRecurring?Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return 0;
+            }
+        }
+
+        // ---- Task templates ----
+        public async Task<string> CreateTaskTemplate(string Name, string TaskName, string Description, int Priroty, string StepsPipeDelimited, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<string>(
+                    $"api/Task/CreateTaskTemplate?Name={Uri.EscapeDataString(Name)}&TaskName={Uri.EscapeDataString(TaskName)}&Description={Uri.EscapeDataString(Description ?? "")}&Priroty={Priroty}&StepsPipeDelimited={Uri.EscapeDataString(StepsPipeDelimited ?? "")}&Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<List<TaskTemplate>> GetTaskTemplates(int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<List<TaskTemplate>>($"api/Task/GetTaskTemplates?Enroll={Enroll}", _jsonOptions);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<List<TemplateStep>> GetTemplateSteps(int TemplateID)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<List<TemplateStep>>($"api/Task/GetTemplateSteps?TemplateID={TemplateID}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<string> DeleteTaskTemplate(int TemplateID, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<string>($"api/Task/DeleteTaskTemplate?TemplateID={TemplateID}&Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<string> ApplyTaskTemplate(int TemplateID, int ProjectID, DateOnly DeadLine, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<string>($"api/Task/ApplyTaskTemplate?TemplateID={TemplateID}&ProjectID={ProjectID}&DeadLine={DeadLine:yyyy-MM-dd}&Enroll={Enroll}");
             }
             catch (Exception ex)
             {

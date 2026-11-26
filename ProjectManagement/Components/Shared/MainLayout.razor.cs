@@ -113,6 +113,8 @@ namespace ProjectManagement.Components.Shared
                 new() { Text = "Calendar", Icon = "fa-solid fa-fw fa-calendar-days", Url = "/Calendar" },
                 new() { Text = "Team Activity", Icon = "fa-solid fa-fw fa-people-group", Url = "/TeamActivity" },
                 new() { Text = "Tasks", Icon = "fa-solid fa-fw fa-tasks", Url = "/Task" },
+                new() { Text = "Task Templates", Icon = "fa-solid fa-fw fa-copy", Url = "/TaskTemplates" },
+                new() { Text = "Recurring Tasks", Icon = "fa-solid fa-fw fa-rotate", Url = "/RecurringTasks" },
                 new() { Text = "Progress Report", Icon = "fa-solid fa-fw fa-chart-line", Url = "/PersonalReport" },
                 new() { Text = "My Task", Icon = "fa-solid fa-fw fa-magnifying-glass", Url = "/MyTask" },
             };

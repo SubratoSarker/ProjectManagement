@@ -1,14 +1,17 @@
 @page "/ActivityLog"
 @attribute [TabItemOption(Text = "Activity Log")]
+@using ClosedXML.Excel
 @using ProjectManagement.Models.Admin
 @using ProjectManagement.Services.Admin
 @inject IAdminServices admin
+@inject IJSRuntime JSRuntime
+@inject ToastService Tost
 
 <PageTitle>Activity Log</PageTitle>
 <h3>Activity Log</h3>
 <p class="text-muted">Most recent 300 actions across the system.</p>
 
-<div class="row mb-3">
+<div class="row mb-3 no-print">
     <div class="col-md-3">
         <label class="form-label">From:</label>
         <input type="date" class="form-control" @bind="fromDate" />
@@ -17,12 +20,14 @@
         <label class="form-label">To:</label>
         <input type="date" class="form-control" @bind="toDate" />
     </div>
-    <div class="col-md-2 align-self-end">
+    <div class="col-md-6 align-self-end">
         <button class="btn btn-primary" @onclick="Load">Filter</button>
+        <button class="btn btn-outline-secondary" @onclick="ExportToExcel"><i class="bi bi-file-earmark-excel"></i> Export to Excel</button>
+        <button class="btn btn-outline-secondary" @onclick="Print"><i class="bi bi-printer"></i> Print / PDF</button>
     </div>
 </div>
 
-<div class="card">
+<div class="card" id="activityLogPrintArea">
     <div class="card-body">
         @if (Entries == null || !Entries.Any())
         {
@@ -73,5 +78,49 @@
     {
         Entries = await admin.GetActivityLog(fromDate, toDate);
         StateHasChanged();
+    }
+
+    private async Task Print()
+    {
+        await JSRuntime.InvokeVoidAsync("printDiv", "activityLogPrintArea");
+    }
+
+    private async Task ExportToExcel()
+    {
+        if (Entries == null || !Entries.Any())
+        {
+            await Tost.Warning("Warning", "Nothing to export.", true);
+            return;
+        }
+        try
+        {
+            using var workbook = new XLWorkbook();
+            var ws = workbook.Worksheets.Add("Activity Log");
+            ws.Cell(1, 1).Value = "When";
+            ws.Cell(1, 2).Value = "By";
+            ws.Cell(1, 3).Value = "Type";
+            ws.Cell(1, 4).Value = "Process";
+            ws.Cell(1, 5).Value = "Description";
+            ws.Range(1, 1, 1, 5).Style.Font.Bold = true;
+
+            for (int i = 0; i < Entries.Count; i++)
+            {
+                var e = Entries[i];
+                ws.Cell(i + 2, 1).Value = e.dteAction.ToString("dd MMM yyyy HH:mm:ss");
+                ws.Cell(i + 2, 2).Value = e.strUserName;
+                ws.Cell(i + 2, 3).Value = e.strType;
+                ws.Cell(i + 2, 4).Value = e.strProcess;
+                ws.Cell(i + 2, 5).Value = e.strDescription;
+            }
+            ws.Columns().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            await JSRuntime.InvokeVoidAsync("downloadFile", "ActivityLog.xlsx", Convert.ToBase64String(stream.ToArray()));
+        }
+        catch (Exception ex)
+        {
+            await Tost.Error("Error", ex.Message, true);
+        }
     }
 }
