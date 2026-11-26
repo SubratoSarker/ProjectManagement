@@ -3,11 +3,14 @@ using ProjectManagement.Models.Admin;
 using ProjectManagement.Models.Task;
 using ProjectManagement.Services.Session;
 using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace ProjectManagement.Services.Admin
 {
     public class AdminServices : IAdminServices
     {
+        private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
         private readonly HttpClient _httpClient;
         private readonly ISessionStorageService _sessionStorageService;
 
@@ -141,6 +144,71 @@ namespace ProjectManagement.Services.Admin
             catch (Exception ex)
             {
                 // Log the exception for debugging purposes
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        // ---- Offboarding / bulk task tooling ----
+        public async Task<List<OffboardingUser>> GetAllUsersForOffboarding()
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<List<OffboardingUser>>("api/Admin/GetAllUsersForOffboarding");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<List<OpenTask>> GetOpenTasksByUser(int UserID)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<List<OpenTask>>($"api/Admin/GetOpenTasksByUser?UserID={UserID}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<BulkActionResult> BulkTaskAction(List<int> TaskIDs, int Mode, int TargetUser, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var query = string.Join("&", TaskIDs.Select(id => $"TaskIDs={id}"));
+                var url = $"api/Admin/BulkTaskAction?{query}&Mode={Mode}&TargetUser={TargetUser}&Enroll={Enroll}";
+                return await _httpClient.GetFromJsonAsync<BulkActionResult>(url, _jsonOptions);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return new BulkActionResult { Failures = { ex.Message } };
+            }
+        }
+
+        // ---- Activity log ----
+        public async Task<List<ActivityLogEntry>> GetActivityLog(DateTime? From, DateTime? To)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var url = "api/Admin/GetActivityLog";
+                var query = new List<string>();
+                if (From.HasValue) { query.Add($"From={From:yyyy-MM-ddTHH:mm:ss}"); }
+                if (To.HasValue) { query.Add($"To={To:yyyy-MM-ddTHH:mm:ss}"); }
+                if (query.Any()) { url += "?" + string.Join("&", query); }
+                return await _httpClient.GetFromJsonAsync<List<ActivityLogEntry>>(url);
+            }
+            catch (Exception ex)
+            {
                 Console.WriteLine($"An error occurred: {ex.Message}");
                 return null;
             }

@@ -158,7 +158,7 @@
 
                     <hr />
 
-                    <!-- Steps -->
+                    <!-- Steps: always visible, not collapsible -->
                     <p class="fw-bold">Steps: <span>@(Steps != null ? $"({Steps.Count()})" : "(0)")</span></p>
                     @if (Steps != null && Steps.Any())
                     {
@@ -214,6 +214,172 @@
                             </EditForm>
                         </div>
                     }
+
+                    <hr />
+
+                    <!-- Labels / Subtasks / Blocked by / Attachments: secondary metadata, kept
+                         compact side-by-side instead of each claiming a full-width block -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="border rounded p-2 h-100">
+                                <p class="fw-bold small mb-2">Labels <span>@(TaskLabels != null ? $"({TaskLabels.Count()})" : "(0)")</span></p>
+                                <div class="mb-2">
+                                    @if (TaskLabels != null && TaskLabels.Any())
+                                    {
+                                        @foreach (var lbl in TaskLabels)
+                                        {
+                                            <span class="badge me-1" style="background-color:@lbl.strColor;">
+                                                @lbl.strName
+                                                <i class="bi bi-x-circle ms-1" style="cursor:pointer" @onclick="() => RemoveLabelFromTask(lbl.intLabelID)"></i>
+                                            </span>
+                                        }
+                                    }
+                                </div>
+                                <div class="input-group input-group-sm mb-2">
+                                    <select class="form-select" @bind="selectedLabelId">
+                                        <option value="0">-- add a label --</option>
+                                        @if (AllLabels != null)
+                                        {
+                                            @foreach (var l in AllLabels)
+                                            {
+                                                <option value="@l.intLabelID">@l.strName</option>
+                                            }
+                                        }
+                                    </select>
+                                    <button class="btn btn-outline-secondary" @onclick="AddLabelToTask"><i class="bi bi-tag"></i></button>
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <input class="form-control" placeholder="New label name" @bind="newLabelName" />
+                                    <input type="color" class="form-control form-control-color" @bind="newLabelColor" title="Label color" />
+                                    <button class="btn btn-outline-secondary" @onclick="CreateNewLabel"><i class="bi bi-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="border rounded p-2 h-100">
+                                <p class="fw-bold small mb-2">Subtasks <span>@(Subtasks != null ? $"({Subtasks.Count()})" : "(0)")</span></p>
+                                @if (Subtasks != null && Subtasks.Any())
+                                {
+                                    <ul class="list-group mb-2">
+                                        @foreach (var sub in Subtasks)
+                                        {
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span>@sub.strTaskName</span>
+                                                <span class="badge bg-secondary">@sub.strStatus</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                <div class="input-group input-group-sm">
+                                    <input class="form-control" placeholder="New subtask name" @bind="newSubtaskName" />
+                                    <button class="btn btn-outline-primary" @onclick="AddSubtask"><i class="bi bi-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="border rounded p-2 h-100">
+                                <p class="fw-bold small mb-2">Blocked by <span>@(Dependencies != null ? $"({Dependencies.Count()})" : "(0)")</span></p>
+                                @if (Dependencies != null && Dependencies.Any())
+                                {
+                                    <div class="mb-2">
+                                        @foreach (var dep in Dependencies)
+                                        {
+                                            <span class="badge me-2 mb-1" style="background-color:@(dep.intStatusID==5||dep.intStatusID==6 ? "#198754" : "#dc3545"); color:white;">
+                                                @dep.strDependsOnTaskName (@dep.strStatus)
+                                                <i class="bi bi-x-circle ms-1" style="cursor:pointer" @onclick="() => RemoveDependency(dep.intDependencyID)"></i>
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <p class="text-muted small">No dependencies.</p>
+                                }
+                                <div class="input-group input-group-sm">
+                                    <select class="form-select" @bind="newDependencyTaskId">
+                                        <option value="0">-- select a task --</option>
+                                        @if (DependencyPickerOptions != null)
+                                        {
+                                            @foreach (var t in DependencyPickerOptions)
+                                            {
+                                                <option value="@t.intTaskID">@t.strTaskName (@t.strStatus)</option>
+                                            }
+                                        }
+                                    </select>
+                                    <button class="btn btn-outline-primary" @onclick="AddDependency"><i class="bi bi-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="border rounded p-2 h-100">
+                                <p class="fw-bold small mb-2">Attachments <span>@(Attachments != null ? $"({Attachments.Count()})" : "(0)")</span></p>
+                                @if (Attachments != null && Attachments.Any())
+                                {
+                                    <ul class="list-group mb-2">
+                                        @foreach (var a in Attachments)
+                                        {
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <div>@a.strFileName</div>
+                                                    <small class="text-muted">@a.strUserName &middot; @a.dteUploaded.ToString("dd MMM")</small>
+                                                </div>
+                                                <div>
+                                                    <button class="btn btn-sm btn-outline-secondary" title="Download" @onclick="() => DownloadAttachment(a.strFileName)">
+                                                        <i class="bi bi-download"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger" title="Remove" @onclick="() => DeleteAttachment(a.intAttachmentID)">
+                                                        <i class="bi bi-x-circle"></i>
+                                                    </button>
+                                                </div>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                <div class="input-group input-group-sm">
+                                    <InputFile OnChange="OnAttachmentSelected" class="form-control" />
+                                    <button class="btn btn-outline-primary" @onclick="UploadSelectedAttachment"><i class="bi bi-upload"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <!-- Comments: always visible, not collapsible -->
+                    <p class="fw-bold">Comments: <span>@(Comments != null ? $"({Comments.Count()})" : "(0)")</span></p>
+                    <div style="max-height:220px; overflow-y:auto;" class="mb-2">
+                        @if (Comments != null && Comments.Any())
+                        {
+                            @foreach (var c in Comments)
+                            {
+                                <div class="mb-2">
+                                    <small class="text-muted">@c.strUserName &middot; @c.dteCreated.ToString("dd MMM, HH:mm")</small>
+                                    <div>@c.strComment</div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted small">No comments yet.</p>
+                        }
+                    </div>
+                    @if (Teammates != null && Teammates.Any())
+                    {
+                        <div class="input-group input-group-sm mb-2">
+                            <select class="form-select" @bind="mentionUserId">
+                                <option value="0">-- mention a teammate --</option>
+                                @foreach (var mate in Teammates)
+                                {
+                                    <option value="@mate.intUserID">@mate.strUserName</option>
+                                }
+                            </select>
+                            <button class="btn btn-outline-secondary" @onclick="InsertMention"><i class="bi bi-at"></i></button>
+                        </div>
+                    }
+                    <div class="input-group input-group-sm mb-3">
+                        <input class="form-control" placeholder="Write a comment..." @bind="newCommentText" />
+                        <button class="btn btn-outline-primary" @onclick="PostComment"><i class="bi bi-send"></i> Post</button>
+                    </div>
 
                     <hr />
 
@@ -354,13 +520,28 @@
 <br />
 <br />
 <div class="container">
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label class="form-label">Filter by label:</label>
+            <select class="form-select" @bind="filterLabelId" @bind:after="OnFilterLabelChanged">
+                <option value="0">-- all labels --</option>
+                @if (AllLabels != null)
+                {
+                    @foreach (var l in AllLabels)
+                    {
+                        <option value="@l.intLabelID">@l.strName</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
     <div class="row">
         <div class="col-md-3">
             <div class="card kanban-column">
                 <div class="card-header bg-primary text-white text-center">
                     <h3>Queue <span>@(ToDo != null ? $"({ToDo.Count()})" : "(0)")</span></h3>
                 </div>
-                <div class="card-body">
+                <div class="card-body" @ondragover="OnDragOver" @ondragover:preventDefault @ondrop="() => OnDrop(2)">
                     @if (ToDo != null && ToDo.Any())
                     {
                         @foreach (var task in ToDo)
@@ -379,7 +560,7 @@
                                 _ => ""
                             };
 
-                            <div class="card task-card mb-3">
+                            <div class="card task-card mb-3" draggable="true" @ondragstart="() => _draggedTaskId = task.intTaskID">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <div>
@@ -444,7 +625,7 @@
                 <div class="card-header bg-warning text-white text-center">
                     <h3>Awaiting Action <span>@(OnHold != null ? $"({OnHold.Count()})" : "(0)")</span></h3>
                 </div>
-                <div class="card-body">
+                <div class="card-body" @ondragover="OnDragOver" @ondragover:preventDefault @ondrop="() => OnDrop(3)">
                     @if (OnHold != null && OnHold.Any())
                     {
                         @foreach (var task in OnHold)
@@ -463,7 +644,7 @@
                                 _ => ""
                             };
 
-                            <div class="card task-card mb-3">
+                            <div class="card task-card mb-3" draggable="true" @ondragstart="() => _draggedTaskId = task.intTaskID">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <div>
@@ -526,7 +707,7 @@
                 <div class="card-header bg-info text-white text-center">
                     <h3>Evaluation <span>@(InReview != null ? $"({InReview.Count()})" : "(0)")</span></h3>
                 </div>
-                <div class="card-body">
+                <div class="card-body" @ondragover="OnDragOver" @ondragover:preventDefault @ondrop="() => OnDrop(4)">
                     @if (InReview != null && InReview.Any())
                     {
                         @foreach (var task in InReview)
@@ -545,7 +726,7 @@
                                 _ => ""
                             };
 
-                            <div class="card task-card mb-3">
+                            <div class="card task-card mb-3" draggable="true" @ondragstart="() => _draggedTaskId = task.intTaskID">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <div>
@@ -610,12 +791,12 @@
                 <div class="card-header bg-success text-white text-center">
                     <h3>Complete <span>@(Compete != null ? $"({Compete.Count()})" : "(0)")</span></h3>
                 </div>
-                <div class="card-body">
+                <div class="card-body" @ondragover="OnDragOver" @ondragover:preventDefault @ondrop="() => OnDrop(5)">
                     @if (Compete != null && Compete.Any())
                     {
                         @foreach (var task in Compete.Take(10))
                         {
-                            <div class="card task-card mb-3">
+                            <div class="card task-card mb-3" draggable="true" @ondragstart="() => _draggedTaskId = task.intTaskID">
                                 <div class="card-body">
                                     <h5 class="card-title">@task.strTaskName</h5>
                                     <p class="card-text">@task.strDescription</p>
@@ -806,6 +987,24 @@
     private bool isPaused = true;
     private System.Timers.Timer? timer;
     private List<Steps> Steps;
+    private List<SubtaskItem> Subtasks;
+    private List<TaskDependency> Dependencies;
+    private List<SubtaskItem> DependencyPickerOptions;
+    private List<TaskLabel> TaskLabels;
+    private List<TaskLabel> AllLabels;
+    private int selectedLabelId;
+    private string newLabelName = string.Empty;
+    private string newLabelColor = "#6c757d";
+    private List<TaskComment> Comments;
+    private List<TaskAttachment> Attachments;
+    private string newSubtaskName = string.Empty;
+    private int newDependencyTaskId;
+    private string newCommentText = string.Empty;
+    private List<Teammate> Teammates;
+    private int mentionUserId;
+    private IBrowserFile selectedAttachmentFile;
+    private int _draggedTaskId;
+    private int filterLabelId;
     bool showTextbox = false;
     private ProjectCreate newProject = new ProjectCreate();
     public int stepId;
@@ -843,6 +1042,18 @@
     {
         TimeSpan t1 = TimeSpan.Parse("00:00");
         await TaskAction(0, TaskID, 0, StatusID, t1);
+    }
+
+    private void OnDragOver(DragEventArgs e) { }
+
+    private async Task OnDrop(int targetStatus)
+    {
+        if (_draggedTaskId != 0)
+        {
+            var taskId = _draggedTaskId;
+            _draggedTaskId = 0;
+            await Change(taskId, targetStatus);
+        }
     }
     public async Task TaskAction(int Type, int TaskID, int User, int Status, TimeSpan time)
     {
@@ -933,18 +1144,200 @@
     }
     public async void load()
     {
+        AllLabels = await task.GetLabels();
+        Teammates = await task.GetTeammates(session.UserID);
         Current = await task.GetCurrentTasks(session.UserID);
-        ToDo = await task.GetTasks(session.UserID, 2);
-        OnHold = await task.GetTasks(session.UserID, 3);
-        InReview = await task.GetTasks(session.UserID, 4);
-        Compete = await task.GetTasks(session.UserID, 5);
+        ToDo = await task.GetTasks(session.UserID, 2, filterLabelId);
+        OnHold = await task.GetTasks(session.UserID, 3, filterLabelId);
+        InReview = await task.GetTasks(session.UserID, 4, filterLabelId);
+        Compete = await task.GetTasks(session.UserID, 5, filterLabelId);
         if (Current!=null)
         {
             PreviouSession = Current.tmWorking;
             isPaused = false;
             Steps = await task.GetStepsByTask(Current.intTaskID);
+            Subtasks = await task.GetSubtasks(Current.intTaskID);
+            Dependencies = await task.GetDependencies(Current.intTaskID);
+            DependencyPickerOptions = await task.GetTasksForDependencyPicker(Current.intTaskID);
+            TaskLabels = await task.GetLabelsByTask(Current.intTaskID);
+            Comments = await task.GetComments(Current.intTaskID);
+            Attachments = await task.GetAttachments(Current.intTaskID);
         }
         StateHasChanged();
+    }
+
+    private async Task OnFilterLabelChanged()
+    {
+        ToDo = await task.GetTasks(session.UserID, 2, filterLabelId);
+        OnHold = await task.GetTasks(session.UserID, 3, filterLabelId);
+        InReview = await task.GetTasks(session.UserID, 4, filterLabelId);
+        Compete = await task.GetTasks(session.UserID, 5, filterLabelId);
+        StateHasChanged();
+    }
+
+    private async Task AddSubtask()
+    {
+        if (string.IsNullOrWhiteSpace(newSubtaskName) || Current == null) { return; }
+        string output = await task.CreateSubtask(newSubtaskName, string.Empty, Current.intTaskID, 2, DateOnly.FromDateTime(DateTime.Today.AddDays(7)), session.UserID);
+        if (output != null && output.Contains("Success"))
+        {
+            await Tost.Success("Success", output, true);
+        }
+        else
+        {
+            await Tost.Error("Error", output ?? "Could not create subtask.", true);
+        }
+        newSubtaskName = string.Empty;
+        Subtasks = await task.GetSubtasks(Current.intTaskID);
+        StateHasChanged();
+    }
+
+    private async Task AddDependency()
+    {
+        if (newDependencyTaskId <= 0 || Current == null) { return; }
+        string output = await task.AddDependency(Current.intTaskID, newDependencyTaskId, session.UserID);
+        if (output != null && output.Contains("Success"))
+        {
+            await Tost.Success("Success", output, true);
+        }
+        else
+        {
+            await Tost.Error("Error", output ?? "Could not add dependency.", true);
+        }
+        newDependencyTaskId = 0;
+        Dependencies = await task.GetDependencies(Current.intTaskID);
+        StateHasChanged();
+    }
+
+    private async Task RemoveDependency(int dependencyId)
+    {
+        string output = await task.RemoveDependency(dependencyId, session.UserID);
+        if (output != null && output.Contains("Success"))
+        {
+            await Tost.Success("Success", output, true);
+        }
+        else
+        {
+            await Tost.Error("Error", output ?? "Could not remove dependency.", true);
+        }
+        Dependencies = await task.GetDependencies(Current.intTaskID);
+        StateHasChanged();
+    }
+
+    private async Task AddLabelToTask()
+    {
+        if (selectedLabelId <= 0 || Current == null) { return; }
+        string output = await task.AssignLabel(Current.intTaskID, selectedLabelId, session.UserID);
+        if (output == null || !output.Contains("Success"))
+        {
+            await Tost.Error("Error", output ?? "Could not assign label.", true);
+        }
+        selectedLabelId = 0;
+        TaskLabels = await task.GetLabelsByTask(Current.intTaskID);
+        StateHasChanged();
+    }
+
+    private async Task RemoveLabelFromTask(int labelId)
+    {
+        string output = await task.RemoveLabel(Current.intTaskID, labelId, session.UserID);
+        if (output == null || !output.Contains("Success"))
+        {
+            await Tost.Error("Error", output ?? "Could not remove label.", true);
+        }
+        TaskLabels = await task.GetLabelsByTask(Current.intTaskID);
+        StateHasChanged();
+    }
+
+    private async Task CreateNewLabel()
+    {
+        if (string.IsNullOrWhiteSpace(newLabelName)) { return; }
+        string output = await task.CreateLabel(newLabelName, newLabelColor, session.UserID);
+        if (output != null && output.Contains("Success"))
+        {
+            await Tost.Success("Success", output, true);
+        }
+        else
+        {
+            await Tost.Error("Error", output ?? "Could not create label.", true);
+        }
+        newLabelName = string.Empty;
+        AllLabels = await task.GetLabels();
+        StateHasChanged();
+    }
+
+    private void InsertMention()
+    {
+        if (mentionUserId <= 0 || Teammates == null) { return; }
+        var mate = Teammates.FirstOrDefault(t => t.intUserID == mentionUserId);
+        if (mate == null) { return; }
+        newCommentText = (newCommentText ?? string.Empty).TrimEnd() + (string.IsNullOrWhiteSpace(newCommentText) ? "" : " ") + "@" + mate.strUserName + " ";
+        mentionUserId = 0;
+    }
+
+    private async Task PostComment()
+    {
+        if (string.IsNullOrWhiteSpace(newCommentText) || Current == null) { return; }
+        string output = await task.AddComment(Current.intTaskID, session.UserID, newCommentText);
+        if (output == null || !output.Contains("Success"))
+        {
+            await Tost.Error("Error", output ?? "Could not post comment.", true);
+        }
+        newCommentText = string.Empty;
+        Comments = await task.GetComments(Current.intTaskID);
+        StateHasChanged();
+    }
+
+    private void OnAttachmentSelected(InputFileChangeEventArgs e)
+    {
+        selectedAttachmentFile = e.File;
+    }
+
+    private async Task UploadSelectedAttachment()
+    {
+        if (selectedAttachmentFile == null || Current == null)
+        {
+            await Tost.Warning("Warning", "Please choose a file first.", true);
+            return;
+        }
+        string output = await task.UploadAttachment(Current.intTaskID, session.UserID, selectedAttachmentFile);
+        if (output != null && output.Contains("Success"))
+        {
+            await Tost.Success("Success", output, true);
+        }
+        else
+        {
+            await Tost.Error("Error", output ?? "Could not upload attachment.", true);
+        }
+        selectedAttachmentFile = null;
+        Attachments = await task.GetAttachments(Current.intTaskID);
+        StateHasChanged();
+    }
+
+    private async Task DeleteAttachment(int attachmentId)
+    {
+        string output = await task.DeleteAttachment(attachmentId, session.UserID);
+        if (output != null && output.Contains("Success"))
+        {
+            await Tost.Success("Success", output, true);
+        }
+        else
+        {
+            await Tost.Error("Error", output ?? "Could not remove attachment.", true);
+        }
+        Attachments = await task.GetAttachments(Current.intTaskID);
+        StateHasChanged();
+    }
+
+    private async Task DownloadAttachment(string fileName)
+    {
+        var bytes = await task.DownloadAttachment(Current.intTaskID, fileName);
+        if (bytes == null)
+        {
+            await Tost.Error("Error", "Could not download the file.", true);
+            return;
+        }
+        string base64 = Convert.ToBase64String(bytes);
+        await JSRuntime.InvokeVoidAsync("downloadFileGeneric", fileName, base64, "application/octet-stream");
     }
     protected void StartTimer()
     {

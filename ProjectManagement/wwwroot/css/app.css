@@ -1,17 +1,465 @@
-﻿:root {
-    --bb-header-color: #e0e0e0;
-    --bb-header-bg: #702cf8;
+/* ============================================================
+   Theme system -- CSS variables keyed off html[data-theme], set via
+   setAppTheme()/getAppTheme() in wwwroot/CustomJS/Ext.js and switched
+   from the "Theme" panel in the settings drawer (MainLayout.razor).
+   "professional" is the default (matches :root so it also applies
+   before JS has run, e.g. on the very first paint).
+   ============================================================ */
+:root,
+html[data-theme="professional"] {
+    --accent: #1f3a5f;
+    --accent-dark: #16293f;
+    --accent-light: #3a5a82;
+    --accent-rgb: 31, 58, 95;
+    --bg-body: #f5f7fa;
+    --bg-card: #ffffff;
+    --bg-subtle: #eef1f5;
+    --text-body: #2b2f33;
+    --text-muted: #6c757d;
+    --border-color: #dfe3e8;
+    --sidebar-bg: #1f3347;
+    --sidebar-text: #eef1f5;
+    --header-bg: #1f3347;
+    --header-text: #eef1f5;
+}
+
+html[data-theme="dark"] {
+    --accent: #6fa0d8;
+    --accent-dark: #4d7fb8;
+    --accent-light: #8fb6e2;
+    --accent-rgb: 111, 160, 216;
+    --bg-body: #14161a;
+    --bg-card: #1e2127;
+    --bg-subtle: #262a31;
+    --text-body: #e6e8eb;
+    --text-muted: #9aa1ab;
+    --border-color: #32363e;
+    --sidebar-bg: #0d0f12;
+    --sidebar-text: #e6e8eb;
+    --header-bg: #0d0f12;
+    --header-text: #e6e8eb;
+}
+
+html[data-theme="vibrant"] {
+    --accent: #5b3df5;
+    --accent-dark: #4729c9;
+    --accent-light: #7d63ff;
+    --accent-rgb: 91, 61, 245;
+    --bg-body: #ece5ff;
+    --bg-card: #ffffff;
+    --bg-subtle: #e4daff;
+    --text-body: #2b2f33;
+    --text-muted: #6c757d;
+    --border-color: #d6c8fb;
+    --sidebar-bg: #352065;
+    --sidebar-text: #f1edff;
+    --header-bg: #352065;
+    --header-text: #f1edff;
+}
+
+html[data-theme="forest"] {
+    --accent: #1f6f54;
+    --accent-dark: #16543f;
+    --accent-light: #3f9272;
+    --accent-rgb: 31, 111, 84;
+    --bg-body: #f1efe2;
+    --bg-card: #ffffff;
+    --bg-subtle: #e6e3d0;
+    --text-body: #263029;
+    --text-muted: #6b7568;
+    --border-color: #d6d2bc;
+    --sidebar-bg: #16342a;
+    --sidebar-text: #eef3ee;
+    --header-bg: #16342a;
+    --header-text: #eef3ee;
+}
+
+html[data-theme="sunset"] {
+    --accent: #d2691e;
+    --accent-dark: #a85115;
+    --accent-light: #e58a46;
+    --accent-rgb: 210, 105, 30;
+    --bg-body: #fcecd8;
+    --bg-card: #ffffff;
+    --bg-subtle: #f6ddb8;
+    --text-body: #3a2a1f;
+    --text-muted: #7a6a5c;
+    --border-color: #efcc9e;
+    --sidebar-bg: #4a2a1a;
+    --sidebar-text: #fbeee0;
+    --header-bg: #4a2a1a;
+    --header-text: #fbeee0;
+}
+
+html[data-theme="ocean"] {
+    --accent: #0e7490;
+    --accent-dark: #0b5b70;
+    --accent-light: #2aa7c4;
+    --accent-rgb: 14, 116, 144;
+    --bg-body: #e6f3f5;
+    --bg-card: #ffffff;
+    --bg-subtle: #d7edf0;
+    --text-body: #1c2b2e;
+    --text-muted: #5f7679;
+    --border-color: #c3e0e4;
+    --sidebar-bg: #0b3d45;
+    --sidebar-text: #e6f6f8;
+    --header-bg: #0b3d45;
+    --header-text: #e6f6f8;
+}
+
+html[data-theme="slate"] {
+    --accent: #4b5563;
+    --accent-dark: #374151;
+    --accent-light: #6b7280;
+    --accent-rgb: 75, 85, 99;
+    --bg-body: #f4f4f5;
+    --bg-card: #ffffff;
+    --bg-subtle: #e4e4e7;
+    --text-body: #27272a;
+    --text-muted: #71717a;
+    --border-color: #d4d4d8;
+    --sidebar-bg: #27272a;
+    --sidebar-text: #f4f4f5;
+    --header-bg: #27272a;
+    --header-text: #f4f4f5;
+}
+
+html[data-theme="rose"] {
+    --accent: #be185d;
+    --accent-dark: #8f1248;
+    --accent-light: #d6407e;
+    --accent-rgb: 190, 24, 93;
+    --bg-body: #fdeef3;
+    --bg-card: #ffffff;
+    --bg-subtle: #fbdce8;
+    --text-body: #3a1f29;
+    --text-muted: #7a5c66;
+    --border-color: #f5c6d9;
+    --sidebar-bg: #4a1530;
+    --sidebar-text: #fbe8ef;
+    --header-bg: #4a1530;
+    --header-text: #fbe8ef;
+}
+
+/* ============================================================
+   Global base
+   ============================================================ */
+/* !important on the text-color rules below is deliberate: BootstrapBlazor's own
+   compiled CSS (bootstrap.blazor.bundle.min.css / motronic.min.css) sets its own
+   hardcoded light-mode text colors on several of these elements with selectors
+   that otherwise beat plain-inheritance from body, which is exactly why dark
+   mode went unreadable -- text staying near-black on a near-black background. */
+html[data-theme="dark"] body,
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .card-body,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] p,
+html[data-theme="dark"] span,
+html[data-theme="dark"] label,
+html[data-theme="dark"] .form-label,
+html[data-theme="dark"] th,
+html[data-theme="dark"] td,
+html[data-theme="dark"] li {
+    color: var(--text-body) !important;
+}
+html[data-theme="dark"] .text-muted {
+    color: var(--text-muted) !important;
+}
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .form-select {
+    background-color: var(--bg-card) !important;
+    color: var(--text-body) !important;
+    border-color: var(--border-color) !important;
+}
+
+body {
+    background-color: var(--bg-body);
+    color: var(--text-body);
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 0.925rem;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    color: var(--text-body) !important;
+}
+
+h3 {
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+}
+
+a {
+    color: var(--accent);
+}
+    a:hover {
+        color: var(--accent-dark);
+    }
+
+/* Scrollbar -- small detail, but a plain OS scrollbar looks out of place
+   against a deliberately themed page */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-subtle);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 6px;
+}
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--accent-light);
+    }
+
+/* ============================================================
+   Cards -- the primary visual unit across almost every page
+   ============================================================ */
+.card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 0.6rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
+}
+
+.card-header {
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    border-top-left-radius: 0.6rem !important;
+    border-top-right-radius: 0.6rem !important;
+}
+
+.card-header.bg-secondary {
+    background-color: var(--bg-subtle) !important;
+    color: var(--text-body) !important;
+}
+
+/* Vibrant gets its own visual signature beyond just the accent hue -- a
+   gradient card header and a colored top border -- since otherwise its mostly
+   light, mostly-neutral card surfaces read as near-identical to Professional. */
+html[data-theme="vibrant"] .card {
+    border-top: 3px solid var(--accent);
+}
+html[data-theme="vibrant"] .card-header {
+    background: linear-gradient(90deg, rgba(var(--accent-rgb), .16), rgba(var(--accent-rgb), .04)) !important;
+}
+
+html[data-theme="forest"] .card {
+    border-top: 3px solid var(--accent);
+}
+html[data-theme="forest"] .card-header {
+    background: linear-gradient(90deg, rgba(var(--accent-rgb), .14), rgba(var(--accent-rgb), .03)) !important;
+}
+
+html[data-theme="sunset"] .card {
+    border-top: 3px solid var(--accent);
+}
+html[data-theme="sunset"] .card-header {
+    background: linear-gradient(90deg, rgba(var(--accent-rgb), .16), rgba(var(--accent-rgb), .04)) !important;
+}
+
+html[data-theme="ocean"] .card {
+    border-top: 3px solid var(--accent);
+}
+html[data-theme="ocean"] .card-header {
+    background: linear-gradient(90deg, rgba(var(--accent-rgb), .15), rgba(var(--accent-rgb), .03)) !important;
+}
+
+html[data-theme="rose"] .card {
+    border-top: 3px solid var(--accent);
+}
+html[data-theme="rose"] .card-header {
+    background: linear-gradient(90deg, rgba(var(--accent-rgb), .15), rgba(var(--accent-rgb), .03)) !important;
+}
+
+/* Slate deliberately skips the gradient-header signature -- it's the plain,
+   minimal/neutral option, styled like Professional rather than the colorful set. */
+
+.kanban-column {
+    border-radius: 0.6rem;
+    overflow: hidden;
+}
+
+.task-card {
+    border-radius: 0.5rem;
+    transition: box-shadow .15s ease, transform .15s ease;
+}
+    .task-card:hover {
+        box-shadow: 0 4px 10px rgba(0, 0, 0, .1);
+    }
+
+.card.h-100 {
+    transition: box-shadow .15s ease;
+}
+    .card.h-100:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, .09);
+    }
+
+/* Collapsible section headers (Labels/Steps/Subtasks/Dependencies/Comments/
+   Attachments on the task detail card) -- give them a visible "tab" look and
+   rotate the chevron on expand, using the aria-expanded state Bootstrap's own
+   collapse JS already toggles on the trigger. */
+.btn[data-bs-toggle="collapse"] {
+    background-color: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    color: var(--text-body);
+    font-weight: 600;
+}
+    .btn[data-bs-toggle="collapse"]:hover {
+        background-color: rgba(var(--accent-rgb), .08);
+        border-color: var(--accent-light);
+    }
+    .btn[data-bs-toggle="collapse"] .bi-chevron-down {
+        display: inline-block;
+        transition: transform .2s ease;
+    }
+    .btn[data-bs-toggle="collapse"][aria-expanded="true"] .bi-chevron-down {
+        transform: rotate(180deg);
+    }
+
+/* Badges -> consistent pill shape across every status/priority/label chip */
+.badge {
+    border-radius: 50rem;
+    font-weight: 500;
+    padding: 0.4em 0.75em;
+    letter-spacing: 0.2px;
+}
+
+/* Table row hover (most tables in this app don't set .table-hover explicitly) */
+.table > tbody > tr {
+    transition: background-color .1s ease;
+}
+    .table > tbody > tr:hover > * {
+        background-color: rgba(var(--accent-rgb), .05);
+    }
+
+/* ============================================================
+   Accent-colored controls -- Bootstrap 5.0 bakes colors as static
+   values rather than CSS variables, so these are overridden directly.
+   ============================================================ */
+.btn {
+    border-radius: 0.45rem;
+    font-weight: 500;
+    transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.btn-sm {
+    border-radius: 0.4rem;
+}
+
+.btn-primary {
+    background-color: var(--accent) !important;
+    border-color: var(--accent) !important;
+}
+    .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+        background-color: var(--accent-dark) !important;
+        border-color: var(--accent-dark) !important;
+    }
+
+.btn-outline-primary {
+    color: var(--accent) !important;
+    border-color: var(--accent) !important;
+}
+    .btn-outline-primary:hover {
+        background-color: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #fff !important;
+    }
+
+.bg-primary {
+    background-color: var(--accent) !important;
+}
+
+.text-primary {
+    color: var(--accent) !important;
+}
+
+.border-primary {
+    border-color: var(--accent) !important;
+}
+
+.badge.bg-primary {
+    background-color: var(--accent) !important;
+}
+
+.progress-bar {
+    background-color: var(--accent);
+}
+.progress-bar.bg-success {
+    background-color: #2f8f5b !important;
+}
+
+.nav-link.active,
+.page-link {
+    color: var(--accent);
+}
+
+.form-control,
+.form-select {
+    border-radius: 0.45rem;
+    border-color: var(--border-color);
+}
+    .form-control:hover,
+    .form-select:hover {
+        border-color: var(--accent-light);
+    }
+    .form-control:focus,
+    .form-select:focus {
+        border-color: var(--accent-light);
+        box-shadow: 0 0 0 0.2rem rgba(var(--accent-rgb), .15);
+    }
+
+/* ============================================================
+   Tables
+   ============================================================ */
+.table {
+    color: var(--text-body);
+}
+.table thead,
+.table thead.table-light {
+    background-color: var(--bg-subtle) !important;
+}
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: rgba(var(--accent-rgb), .025);
+}
+
+/* ============================================================
+   Modals
+   ============================================================ */
+.modal-content {
+    border-radius: 0.6rem;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .15);
+}
+.modal-header {
+    border-bottom: 1px solid var(--border-color);
+}
+.modal-footer {
+    border-top: 1px solid var(--border-color);
+}
+
+/* ============================================================
+   BootstrapBlazor layout shell (header/sidebar/menu) -- these are the
+   component library's own CSS variables, already scoped under .layout
+   ============================================================ */
+:root {
+    --bb-header-color: var(--header-text);
+    --bb-header-bg: var(--header-bg);
 }
 
 .layout {
-    --bb-layout-header-background: var(--bb-header-bg);
-    --bb-layout-sidebar-banner-background: var(--bb-header-bg);
-    --bb-layout-header-color: var(--bb-header-color);
-    --bb-layout-title-color: var(--bb-header-color);
+    --bb-layout-header-background: var(--header-bg);
+    --bb-layout-sidebar-banner-background: var(--sidebar-bg);
+    --bb-layout-header-color: var(--header-text);
+    --bb-layout-title-color: var(--header-text);
+    background-color: var(--bg-body);
 }
 
 .layout-header {
-    border-bottom: 1px solid var(--bs-border-color);
+    border-bottom: 1px solid var(--border-color);
 }
 
     .layout-header .widget {
@@ -19,7 +467,7 @@
     }
 
 .layout-banner {
-    border-bottom: 1px solid var(--bs-border-color);
+    border-bottom: 1px solid rgba(255, 255, 255, .12);
 }
 
     .layout-banner .layout-logo {
@@ -27,11 +475,13 @@
     }
 
 .layout-side {
-    border-right: 1px solid var(--bs-border-color);
+    background-color: var(--sidebar-bg);
+    border-right: 1px solid var(--border-color);
 }
 
 .layout-footer {
-    border-top: 1px solid var(--bs-border-color);
+    border-top: 1px solid var(--border-color);
+    background-color: var(--bg-card);
 }
 
 .dropdown-logout {
@@ -134,8 +584,147 @@
 }
 
 .menu {
-    --bb-menu-active-color: #702cf8;
-    --bb-menu-bar-bg: #702cf8;
-    --bb-menu-item-hover-bg: #702cf8;
+    --bb-menu-active-color: var(--accent-light);
+    --bb-menu-bar-bg: var(--sidebar-bg);
+    --bb-menu-item-hover-bg: var(--accent);
     --bb-menu-item-hover-color: #fff;
 }
+
+/* ============================================================
+   Theme switcher swatches (drawer panel)
+   ============================================================ */
+.theme-swatch {
+    width: 100%;
+    height: 48px;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    border: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+    .theme-swatch.active {
+        border-color: var(--accent);
+    }
+.theme-swatch-professional {
+    background: linear-gradient(135deg, #1f3347 50%, #f5f7fa 50%);
+}
+.theme-swatch-dark {
+    background: linear-gradient(135deg, #0d0f12 50%, #1e2127 50%);
+}
+.theme-swatch-vibrant {
+    background: linear-gradient(135deg, #352065 50%, #5b3df5 50%);
+}
+.theme-swatch-forest {
+    background: linear-gradient(135deg, #16342a 50%, #1f6f54 50%);
+}
+.theme-swatch-sunset {
+    background: linear-gradient(135deg, #4a2a1a 50%, #d2691e 50%);
+}
+.theme-swatch-ocean {
+    background: linear-gradient(135deg, #0b3d45 50%, #0e7490 50%);
+}
+.theme-swatch-slate {
+    background: linear-gradient(135deg, #27272a 50%, #4b5563 50%);
+}
+.theme-swatch-rose {
+    background: linear-gradient(135deg, #4a1530 50%, #be185d 50%);
+}
+
+/* Fixed (not theme-aware) light surface for the bottleneck funnel chart: its
+   labels are drawn by amCharts in JS with a hardcoded dark fill, so this box
+   needs to stay light regardless of theme or that text becomes unreadable. */
+.pm-chart-surface {
+    background-color: #f8f9fa;
+}
+
+/* ============================================================
+   Calendar page
+   ============================================================ */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    background-color: var(--border-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.calendar-dow {
+    background-color: var(--bg-subtle);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-align: center;
+    padding: 0.4rem 0;
+}
+
+.calendar-cell {
+    background-color: var(--bg-card);
+    min-height: 90px;
+    padding: 0.3rem;
+}
+    .calendar-cell.empty {
+        background-color: var(--bg-subtle);
+    }
+    .calendar-cell.today {
+        box-shadow: inset 0 0 0 2px var(--accent);
+    }
+
+.calendar-daynum {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.2rem;
+}
+
+.calendar-task-pill {
+    font-size: 0.7rem;
+    color: #fff;
+    border-radius: 0.3rem;
+    padding: 0.1rem 0.35rem;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.calendar-more {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+@media (max-width: 576px) {
+    .calendar-cell {
+        min-height: 60px;
+    }
+    .calendar-dow, .calendar-daynum {
+        font-size: 0.65rem;
+    }
+}
+
+/* ============================================================
+   Header search box (MainLayout)
+   ============================================================ */
+.header-search {
+    max-width: 320px;
+}
+.header-search-input {
+    background-color: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(255, 255, 255, .2);
+    color: var(--header-text);
+}
+    .header-search-input::placeholder {
+        color: rgba(255, 255, 255, .65);
+    }
+    .header-search-input:focus {
+        background-color: rgba(255, 255, 255, .18);
+        color: var(--header-text);
+        box-shadow: none;
+        border-color: rgba(255, 255, 255, .4);
+    }

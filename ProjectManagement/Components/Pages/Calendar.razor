@@ -1,0 +1,133 @@
+@page "/Calendar"
+@attribute [TabItemOption(Text = "Calendar")]
+@using ProjectManagement.Models.Dashboard
+@using ProjectManagement.Services.Dashboard
+@using ProjectManagement.Services.Session
+@inject IDashboardService dashboard
+@inject Blazored.SessionStorage.ISessionStorageService sess
+
+<PageTitle>Calendar</PageTitle>
+<h3>Calendar</h3>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <button class="btn btn-outline-secondary" @onclick="PrevMonth"><i class="bi bi-chevron-left"></i></button>
+    <h5 class="mb-0">@currentMonth.ToString("MMMM yyyy")</h5>
+    <button class="btn btn-outline-secondary" @onclick="NextMonth"><i class="bi bi-chevron-right"></i></button>
+</div>
+
+@if (Tasks == null)
+{
+    <p class="text-muted">Loading...</p>
+}
+else
+{
+    <div class="calendar-grid">
+        @foreach (var dow in new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" })
+        {
+            <div class="calendar-dow">@dow</div>
+        }
+        @foreach (var day in CalendarDays())
+        {
+            var dayTasks = day.HasValue ? TasksByDay.GetValueOrDefault(day.Value, new List<CalendarTask>()) : new List<CalendarTask>();
+            <div class="calendar-cell @(day.HasValue && day.Value == DateOnly.FromDateTime(DateTime.Today) ? "today" : "") @(day == null ? "empty" : "")">
+                @if (day.HasValue)
+                {
+                    <div class="calendar-daynum">@day.Value.Day</div>
+                    @foreach (var t in dayTasks.Take(3))
+                    {
+                        <div class="calendar-task-pill @StatusPillClass(t.intStatusID)" title="@t.strTaskName (@t.strStatus) - @t.strUserName"
+                             @onclick="() => Selected = t">
+                            @t.strTaskName
+                        </div>
+                    }
+                    @if (dayTasks.Count > 3)
+                    {
+                        <div class="calendar-more">+@(dayTasks.Count - 3) more</div>
+                    }
+                }
+            </div>
+        }
+    </div>
+}
+
+@if (Selected != null)
+{
+    <div class="modal fade show" style="display:block; background-color: rgba(0,0,0,.5);" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@Selected.strTaskName</h5>
+                    <button type="button" class="btn-close" @onclick="() => Selected = null"></button>
+                </div>
+                <div class="modal-body">
+                    <p><span class="fw-bold text-muted">Project:</span> @Selected.strProjectName</p>
+                    <p><span class="fw-bold text-muted">Assigned to:</span> @Selected.strUserName</p>
+                    <p><span class="fw-bold text-muted">Due:</span> @Selected.dteDeadLine.ToString("dd MMM yyyy")</p>
+                    <p><span class="fw-bold text-muted">Status:</span> <span class="badge @StatusPillClass(Selected.intStatusID)">@Selected.strStatus</span></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => Selected = null">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private SessionServices session = new SessionServices();
+    private DateOnly currentMonth = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private List<CalendarTask> Tasks;
+    private Dictionary<DateOnly, List<CalendarTask>> TasksByDay = new();
+    private CalendarTask Selected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        session = await sess.GetItemAsync<SessionServices>("session");
+        await LoadMonth();
+    }
+
+    private async Task LoadMonth()
+    {
+        if (session == null) { return; }
+        var from = currentMonth;
+        var to = currentMonth.AddMonths(1).AddDays(-1);
+        Tasks = await dashboard.GetCalendarTasks(session.UserID, from, to);
+        TasksByDay = (Tasks ?? new List<CalendarTask>())
+            .GroupBy(t => t.dteDeadLine)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.intStatusID == 1).ToList());
+    }
+
+    private async Task PrevMonth()
+    {
+        currentMonth = currentMonth.AddMonths(-1);
+        await LoadMonth();
+    }
+
+    private async Task NextMonth()
+    {
+        currentMonth = currentMonth.AddMonths(1);
+        await LoadMonth();
+    }
+
+    private List<DateOnly?> CalendarDays()
+    {
+        var days = new List<DateOnly?>();
+        int leadingBlanks = (int)currentMonth.DayOfWeek;
+        for (int i = 0; i < leadingBlanks; i++) { days.Add(null); }
+        var daysInMonth = DateTime.DaysInMonth(currentMonth.Year, currentMonth.Month);
+        for (int d = 1; d <= daysInMonth; d++) { days.Add(new DateOnly(currentMonth.Year, currentMonth.Month, d)); }
+        return days;
+    }
+
+    private string StatusPillClass(int statusId) => statusId switch
+    {
+        1 => "bg-primary",      // Current
+        2 => "bg-secondary",    // Pending
+        3 => "bg-warning text-dark", // OnHold
+        4 => "bg-info text-dark",    // Review
+        5 => "bg-success",     // Complete
+        7 => "bg-dark",        // Meeting
+        8 => "bg-danger",      // Emergency Support
+        _ => "bg-secondary"
+    };
+}

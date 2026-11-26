@@ -1,0 +1,196 @@
+@page "/TeamActivity"
+@attribute [TabItemOption(Text = "Team Activity")]
+@using ProjectManagement.Models.Dashboard
+@using ProjectManagement.Models.Task
+@using ProjectManagement.Services.Dashboard
+@using ProjectManagement.Services.TaskM
+@using ProjectManagement.Services.Session
+@inject IDashboardService dashboard
+@inject ITaskServices task
+@inject Blazored.SessionStorage.ISessionStorageService sess
+@inject ToastService Tost
+
+<PageTitle>Team Activity</PageTitle>
+<h3>Team Activity</h3>
+<p class="text-muted">Everyone's open tasks (Current / Pending / OnHold / Review). Click a task to view it, add steps, or comment.</p>
+
+@if (Members == null || !Members.Any())
+{
+    <p class="text-muted">No team members to show.</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var m in Members)
+        {
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-black">@m.strUserName</div>
+                    <div class="card-body">
+                        @if (MemberTasks.TryGetValue(m.intUserID, out var tasks) && tasks.Any())
+                        {
+                            <ul class="list-group">
+                                @foreach (var t in tasks)
+                                {
+                                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                                        style="cursor:pointer"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#teamTaskModal"
+                                        @onclick="() => OpenTaskDetail(t.intTaskID)">
+                                        <span>@t.strTaskName</span>
+                                        <span class="badge bg-secondary">@t.strStatus</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0">No open tasks.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<div class="modal fade" id="teamTaskModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@(SelectedTask?.strTaskName)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (SelectedTask != null)
+                {
+                    <p class="text-muted">@SelectedTask.strProjectName &middot; Priority: @((TaskPriority)SelectedTask.intPriroty) &middot; Due @SelectedTask.dteDeadLine.ToString("dd MMM yyyy")</p>
+                    <p>@SelectedTask.strDescription</p>
+                    <hr />
+
+                    <p class="fw-bold">Steps:</p>
+                    @if (SelectedSteps != null && SelectedSteps.Any())
+                    {
+                        <ul class="list-group mb-2">
+                            @foreach (var step in SelectedSteps)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>@step.strStep</span>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" checked="@step.isDone"
+                                               @onchange="() => ToggleStep(step.intStepId, step.isDone)" />
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    <div class="input-group input-group-sm mb-3">
+                        <input class="form-control" placeholder="New step" @bind="newStepName" />
+                        <button class="btn btn-outline-primary" @onclick="AddStep"><i class="bi bi-plus"></i> Add</button>
+                    </div>
+
+                    <hr />
+                    <p class="fw-bold">Comments:</p>
+                    <div style="max-height:220px; overflow-y:auto;" class="mb-2">
+                        @if (SelectedComments != null && SelectedComments.Any())
+                        {
+                            @foreach (var c in SelectedComments)
+                            {
+                                <div class="mb-2">
+                                    <small class="text-muted">@c.strUserName &middot; @c.dteCreated.ToString("dd MMM, HH:mm")</small>
+                                    <div>@c.strComment</div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted small">No comments yet.</p>
+                        }
+                    </div>
+                    <div class="input-group input-group-sm">
+                        <input class="form-control" placeholder="Write a comment..." @bind="newCommentText" />
+                        <button class="btn btn-outline-primary" @onclick="PostComment"><i class="bi bi-send"></i> Post</button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private SessionServices session = new SessionServices();
+    private List<TeamActivityMember> Members;
+    private Dictionary<int, List<OpenTask>> MemberTasks = new();
+
+    private Tasks SelectedTask;
+    private List<Steps> SelectedSteps;
+    private List<TaskComment> SelectedComments;
+    private string newStepName = string.Empty;
+    private string newCommentText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        session = await sess.GetItemAsync<SessionServices>("session");
+        if (session != null)
+        {
+            Members = await dashboard.GetTeamActivity(session.UserID);
+            if (Members != null)
+            {
+                foreach (var m in Members)
+                {
+                    MemberTasks[m.intUserID] = await task.GetOpenTasksForUser(m.intUserID) ?? new List<OpenTask>();
+                }
+                // Members with no open tasks go last; alphabetical order (as the proc already
+                // returns it) is preserved within each group since OrderBy is a stable sort.
+                Members = Members.OrderBy(m => MemberTasks[m.intUserID].Any() ? 0 : 1).ToList();
+            }
+        }
+    }
+
+    private async Task OpenTaskDetail(int taskId)
+    {
+        SelectedTask = await task.GetTask(taskId);
+        SelectedSteps = await task.GetStepsByTask(taskId);
+        SelectedComments = await task.GetComments(taskId);
+        newStepName = string.Empty;
+        newCommentText = string.Empty;
+        StateHasChanged();
+    }
+
+    private async Task AddStep()
+    {
+        if (string.IsNullOrWhiteSpace(newStepName) || SelectedTask == null) { return; }
+        string output = await task.StepManage(2, newStepName, false, SelectedTask.intTaskID, session.UserID);
+        if (output == null || !output.Contains("Success"))
+        {
+            await Tost.Error("Error", output ?? "Could not add step.", true);
+        }
+        newStepName = string.Empty;
+        SelectedSteps = await task.GetStepsByTask(SelectedTask.intTaskID);
+        StateHasChanged();
+    }
+
+    private async Task ToggleStep(int stepId, bool currentStatus)
+    {
+        string output = await task.StepManage(0, "a", !currentStatus, stepId, session.UserID);
+        if (output == null || !output.Contains("Success"))
+        {
+            await Tost.Error("Error", output ?? "Could not update step.", true);
+        }
+        SelectedSteps = await task.GetStepsByTask(SelectedTask.intTaskID);
+        StateHasChanged();
+    }
+
+    private async Task PostComment()
+    {
+        if (string.IsNullOrWhiteSpace(newCommentText) || SelectedTask == null) { return; }
+        string output = await task.AddComment(SelectedTask.intTaskID, session.UserID, newCommentText);
+        if (output == null || !output.Contains("Success"))
+        {
+            await Tost.Error("Error", output ?? "Could not post comment.", true);
+        }
+        newCommentText = string.Empty;
+        SelectedComments = await task.GetComments(SelectedTask.intTaskID);
+        StateHasChanged();
+    }
+}

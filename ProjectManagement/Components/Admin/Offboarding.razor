@@ -1,0 +1,238 @@
+@page "/Offboarding"
+@attribute [TabItemOption(Text = "Bulk Task Manager")]
+@using ProjectManagement.Models.Admin
+@using ProjectManagement.Models.Task
+@using ProjectManagement.Services.Admin
+@using ProjectManagement.Services.Session
+@inject IAdminServices admin
+@inject Blazored.SessionStorage.ISessionStorageService sess
+@inject IJSRuntime JSRuntime
+@inject ToastService Tost
+
+<PageTitle>Bulk Task Manager</PageTitle>
+<h3>Bulk Task Manager</h3>
+<p class="text-muted">Pick any team member (inactive accounts are listed first) to view and bulk-manage their tasks -- reassign work across the team or close tasks in any status, not just when someone is leaving.</p>
+
+<div class="row mb-3">
+    <div class="col-md-5">
+        <label class="form-label">User:</label>
+        <select class="form-select" @bind="selectedUserId" @bind:after="OnUserChanged">
+            <option value="0">-- select a user --</option>
+            @if (Users != null)
+            {
+                @foreach (var u in Users)
+                {
+                    <option value="@u.intUserID">@u.strUserName (@u.strTeamName)@(u.isActive ? "" : " - Inactive")</option>
+                }
+            }
+        </select>
+    </div>
+    @if (selectedUserId != 0 && OpenTasks != null && OpenTasks.Any())
+    {
+        <div class="col-md-4">
+            <label class="form-label">Filter by status:</label>
+            <select class="form-select" @bind="statusFilter" @bind:after="OnStatusFilterChanged">
+                <option value="0">-- all statuses --</option>
+                @foreach (var s in OpenTasks.Select(t => new { t.intStatusID, t.strStatus }).Distinct().OrderBy(s => s.strStatus))
+                {
+                    <option value="@s.intStatusID">@s.strStatus</option>
+                }
+            </select>
+        </div>
+    }
+</div>
+
+@if (selectedUserId != 0)
+{
+    <div class="card">
+        <div class="card-header bg-secondary text-black">
+            Open Tasks <span>@(FilteredTasks != null ? $"({FilteredTasks.Count()})" : "(0)")</span>
+        </div>
+        <div class="card-body">
+            @if (FilteredTasks == null || !FilteredTasks.Any())
+            {
+                <p class="text-muted">@(statusFilter == 0 ? "This user has no open tasks." : "No tasks in that status.")</p>
+            }
+            else
+            {
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-striped">
+                        <thead class="table-light text-center">
+                            <tr>
+                                <th><input type="checkbox" checked="@allSelected" @onchange="ToggleSelectAll" /></th>
+                                <th>Task</th>
+                                <th>Project</th>
+                                <th>Due</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in FilteredTasks)
+                            {
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" checked="@IsSelected(t.intTaskID)"
+                                               @onchange="(e) => ToggleSelected(t.intTaskID, (bool)e.Value)" />
+                                    </td>
+                                    <td>@t.strTaskName</td>
+                                    <td>@t.strProjectName</td>
+                                    <td>@t.dteDeadLine.ToString("dd MMM yyyy")</td>
+                                    <td>@t.strStatus</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="row align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label">Reassign selected to:</label>
+                        <select class="form-select" @bind="reassignToUserId">
+                            <option value="0">-- select a user --</option>
+                            @if (ActiveUsers != null)
+                            {
+                                @foreach (var u in ActiveUsers)
+                                {
+                                    <option value="@u.intUserID">@u.strUserName</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary" @onclick="ReassignSelected">
+                            <i class="bi bi-arrow-left-right"></i> Reassign Selected
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-danger" @onclick="CloseSelected">
+                            <i class="bi bi-x-circle"></i> Close Selected
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private SessionServices session = new SessionServices();
+    private List<OffboardingUser> Users;
+    private List<AllUser> ActiveUsers;
+    private int selectedUserId;
+    private int reassignToUserId;
+    private int statusFilter;
+    private List<OpenTask> OpenTasks;
+    private List<OpenTask> FilteredTasks => OpenTasks == null
+        ? null
+        : (statusFilter == 0 ? OpenTasks : OpenTasks.Where(t => t.intStatusID == statusFilter).ToList());
+    private HashSet<int> selectedTaskIds = new();
+    private bool allSelected = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        session = await sess.GetItemAsync<SessionServices>("session");
+        Users = await admin.GetAllUsersForOffboarding();
+        ActiveUsers = await admin.GetAllUser(0);
+    }
+
+    private async Task OnUserChanged()
+    {
+        selectedTaskIds.Clear();
+        statusFilter = 0;
+        if (selectedUserId == 0)
+        {
+            OpenTasks = null;
+            return;
+        }
+        OpenTasks = await admin.GetOpenTasksByUser(selectedUserId);
+        if (OpenTasks != null)
+        {
+            selectedTaskIds = OpenTasks.Select(t => t.intTaskID).ToHashSet();
+        }
+        allSelected = true;
+    }
+
+    private void OnStatusFilterChanged()
+    {
+        // Selection scope always matches what's currently visible -- switching the filter
+        // re-selects every task in the new (narrower or wider) view by default.
+        if (FilteredTasks != null)
+        {
+            selectedTaskIds = FilteredTasks.Select(t => t.intTaskID).ToHashSet();
+        }
+        allSelected = true;
+    }
+
+    private bool IsSelected(int taskId) => selectedTaskIds.Contains(taskId);
+
+    private void ToggleSelected(int taskId, bool isChecked)
+    {
+        if (isChecked) { selectedTaskIds.Add(taskId); }
+        else { selectedTaskIds.Remove(taskId); }
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        allSelected = (bool)e.Value;
+        if (allSelected && FilteredTasks != null)
+        {
+            selectedTaskIds = FilteredTasks.Select(t => t.intTaskID).ToHashSet();
+        }
+        else
+        {
+            selectedTaskIds.Clear();
+        }
+    }
+
+    private async Task ReassignSelected()
+    {
+        if (!selectedTaskIds.Any())
+        {
+            await Tost.Warning("Warning", "Select at least one task.", true);
+            return;
+        }
+        if (reassignToUserId == 0)
+        {
+            await Tost.Warning("Warning", "Pick a user to reassign to.", true);
+            return;
+        }
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Reassign {selectedTaskIds.Count} task(s) to the selected user?");
+        if (!confirmed) { return; }
+
+        var result = await admin.BulkTaskAction(selectedTaskIds.ToList(), 1, reassignToUserId, session.UserID);
+        await ReportResult(result);
+        await OnUserChanged();
+    }
+
+    private async Task CloseSelected()
+    {
+        if (!selectedTaskIds.Any())
+        {
+            await Tost.Warning("Warning", "Select at least one task.", true);
+            return;
+        }
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Close {selectedTaskIds.Count} task(s)? This marks them Removed.");
+        if (!confirmed) { return; }
+
+        var result = await admin.BulkTaskAction(selectedTaskIds.ToList(), 0, 0, session.UserID);
+        await ReportResult(result);
+        await OnUserChanged();
+    }
+
+    private async Task ReportResult(BulkActionResult result)
+    {
+        if (result == null)
+        {
+            await Tost.Error("Error", "The request failed.", true);
+            return;
+        }
+        if (result.Failures.Any())
+        {
+            await Tost.Warning("Partial success", $"{result.SuccessCount}/{result.Total} succeeded. Failures: {string.Join("; ", result.Failures)}", true);
+        }
+        else
+        {
+            await Tost.Success("Success", $"{result.SuccessCount}/{result.Total} task(s) updated.", true);
+        }
+    }
+}

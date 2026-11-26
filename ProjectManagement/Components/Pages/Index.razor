@@ -198,10 +198,21 @@
             <br />
             @if (TR.Any())
             {
-                <h3 class="text-center">Pending Team Requests</h3>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h3 class="mb-0">Pending Team Requests</h3>
+                    <div>
+                        <button class="btn btn-sm btn-success" @onclick="() => BulkAction(1)">
+                            <i class="bi bi-check-circle"></i> Bulk Approve (@selectedRequestIds.Count)
+                        </button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => BulkAction(2)">
+                            <i class="bi bi-x-circle"></i> Bulk Reject (@selectedRequestIds.Count)
+                        </button>
+                    </div>
+                </div>
                 <table class="table table-striped">
                     <thead>
                         <tr>
+                            <th><input type="checkbox" checked="@allRequestsSelected" @onchange="ToggleSelectAllRequests" /></th>
                             <th>Action</th>
                             <th>User</th>
                             <th>Type</th>
@@ -212,19 +223,25 @@
                             <th>Created Date</th>
                             <th>From</th>
                             <th>To</th>
-                            <th>Working Time</th>                            
+                            <th>Working Time</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var request in TR)
                         {
                             <tr>
-                                <button class="btn btn-primary"
-                                        data-bs-toggle="modal"
-                                        @onclick="() => GetRequestID(request.intID)"
-                                        data-bs-target="#actionModal">
-                                    Action
-                                </button>
+                                <td>
+                                    <input type="checkbox" checked="@selectedRequestIds.Contains(request.intID)"
+                                           @onchange="(e) => ToggleRequestSelected(request.intID, (bool)e.Value)" />
+                                </td>
+                                <td>
+                                    <button class="btn btn-primary"
+                                            data-bs-toggle="modal"
+                                            @onclick="() => GetRequestID(request.intID)"
+                                            data-bs-target="#actionModal">
+                                        Action
+                                    </button>
+                                </td>
                                 <td>@request.strUserName</td>
                                 <td>@request.Type</td>
                                 <td>@request.strProjectName</td>
@@ -235,7 +252,7 @@
                                 <td>@request.strFrom</td>
                                 <td>@request.strTo</td>
                                 <td>@request.tmWorking</td>
-                                
+
                             </tr>
                         }
                     </tbody>
@@ -390,6 +407,8 @@
     public List<Request> PR = new List<Request>();
     public List<Request> TR = new List<Request>();
     int RequestID;
+    private HashSet<int> selectedRequestIds = new();
+    private bool allRequestsSelected = true;
     private TimeOnly StartTime { get; set; } = new TimeOnly(DateTime.Now.AddHours(-1).Hour, DateTime.Now.Minute);
     private TimeOnly EndTime { get; set; } = new TimeOnly(DateTime.Now.Hour, DateTime.Now.Minute);
     private DateOnly RequestDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
@@ -506,6 +525,46 @@
         StateHasChanged();
     }
 
+    private void ToggleRequestSelected(int requestId, bool isChecked)
+    {
+        if (isChecked) { selectedRequestIds.Add(requestId); }
+        else { selectedRequestIds.Remove(requestId); }
+    }
+
+    private void ToggleSelectAllRequests(ChangeEventArgs e)
+    {
+        allRequestsSelected = (bool)e.Value;
+        selectedRequestIds = allRequestsSelected ? TR.Select(r => r.intID).ToHashSet() : new HashSet<int>();
+    }
+
+    private async Task BulkAction(int Action)
+    {
+        if (!selectedRequestIds.Any())
+        {
+            await Toast.Warning("Warning", "Select at least one request.", true);
+            return;
+        }
+        string verb = Action == 1 ? "Approve" : "Reject";
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"{verb} {selectedRequestIds.Count} request(s)?");
+        if (!confirmed) { return; }
+
+        var result = await project.BulkRequestAction(selectedRequestIds.ToList(), session.UserID, Action);
+        if (result == null)
+        {
+            await Toast.Error("Error", "The request failed.", true);
+        }
+        else if (result.Failures.Any())
+        {
+            await Toast.Warning("Partial success", $"{result.SuccessCount}/{result.Total} succeeded. Failures: {string.Join("; ", result.Failures)}", true);
+        }
+        else
+        {
+            await Toast.Success("Success", $"{result.SuccessCount}/{result.Total} request(s) {verb.ToLower()}d.", true);
+        }
+        load();
+        StateHasChanged();
+    }
+
     public async void load()
     {
         ppu = await task.GetProjectByUser(session.UserID,0);
@@ -514,6 +573,8 @@
         {
             TR = await task.GetRequest(session.UserID, session.Boss);
         }
+        selectedRequestIds = TR != null ? TR.Select(r => r.intID).ToHashSet() : new HashSet<int>();
+        allRequestsSelected = true;
         StateHasChanged();
     }
     protected override async Task OnInitializedAsync()

@@ -1,0 +1,77 @@
+@page "/ActivityLog"
+@attribute [TabItemOption(Text = "Activity Log")]
+@using ProjectManagement.Models.Admin
+@using ProjectManagement.Services.Admin
+@inject IAdminServices admin
+
+<PageTitle>Activity Log</PageTitle>
+<h3>Activity Log</h3>
+<p class="text-muted">Most recent 300 actions across the system.</p>
+
+<div class="row mb-3">
+    <div class="col-md-3">
+        <label class="form-label">From:</label>
+        <input type="date" class="form-control" @bind="fromDate" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">To:</label>
+        <input type="date" class="form-control" @bind="toDate" />
+    </div>
+    <div class="col-md-2 align-self-end">
+        <button class="btn btn-primary" @onclick="Load">Filter</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        @if (Entries == null || !Entries.Any())
+        {
+            <p class="text-muted">No activity in this range.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-striped">
+                    <thead class="table-light text-center">
+                        <tr>
+                            <th>When</th>
+                            <th>By</th>
+                            <th>Type</th>
+                            <th>Process</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in Entries)
+                        {
+                            <tr>
+                                <td>@e.dteAction.ToString("dd MMM yyyy HH:mm:ss")</td>
+                                <td>@e.strUserName</td>
+                                <td>@e.strType</td>
+                                <td>@e.strProcess</td>
+                                <td>@e.strDescription</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<ActivityLogEntry> Entries;
+    private DateTime fromDate = DateTime.Today.AddDays(-7);
+    private DateTime toDate = DateTime.Today.AddDays(1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        Entries = await admin.GetActivityLog(fromDate, toDate);
+        StateHasChanged();
+    }
+}

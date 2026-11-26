@@ -1,4 +1,5 @@
 ﻿using Blazored.SessionStorage;
+using Microsoft.AspNetCore.Components.Forms;
 using ProjectManagement.Models.Admin;
 using ProjectManagement.Models.ProjectModel;
 using ProjectManagement.Models.Task;
@@ -31,7 +32,7 @@ namespace ProjectManagement.Services.TaskM
             try
             {
                 await SetAuthorizationHeader();
-                var result = await _httpClient.GetFromJsonAsync<string>($"api/Task/CreateTask?Name={Name}&Description={Description}&ReqFrom={ReqFrom}&Priroty={Priroty}&DeadLine={DeadLine}&Enroll={Enroll}&Project={Project}");
+                var result = await _httpClient.GetFromJsonAsync<string>($"api/Task/CreateTask?Name={Name}&Description={Description}&ReqFrom={ReqFrom}&Priroty={Priroty}&DeadLine={DeadLine:yyyy-MM-dd}&Enroll={Enroll}&Project={Project}");
                 return result;
             }
             catch (Exception ex)
@@ -57,12 +58,12 @@ namespace ProjectManagement.Services.TaskM
                 return null;
             }
         }
-        public async Task<List<Tasks>> GetTasks(int Enroll, int Status)
+        public async Task<List<Tasks>> GetTasks(int Enroll, int Status, int LabelID = 0)
         {
             try
             {
                 await SetAuthorizationHeader();
-                var result = await _httpClient.GetFromJsonAsync<List<Tasks>>($"api/Task/GetTasks?Enroll={Enroll}&Status={Status}");
+                var result = await _httpClient.GetFromJsonAsync<List<Tasks>>($"api/Task/GetTasks?Enroll={Enroll}&Status={Status}&LabelID={LabelID}");
                 return result;
             }
             catch (Exception ex)
@@ -168,7 +169,7 @@ namespace ProjectManagement.Services.TaskM
             try
             {
                 await SetAuthorizationHeader();
-                var result = await _httpClient.GetFromJsonAsync<string>($"api/Task/Request?TaskName={TaskName}&Description={Description}&RequestFrom={RequestFrom}&USerID={USerID}&Project={Project}&Date={Date}&Status={Status}&tm={tm}&From={From}&To={To}");
+                var result = await _httpClient.GetFromJsonAsync<string>($"api/Task/Request?TaskName={TaskName}&Description={Description}&RequestFrom={RequestFrom}&USerID={USerID}&Project={Project}&Date={Date:yyyy-MM-ddTHH:mm:ss}&Status={Status}&tm={tm}&From={From}&To={To}");
                 return result;
             }
             catch (Exception ex)
@@ -243,7 +244,7 @@ namespace ProjectManagement.Services.TaskM
             try
             {
                 await SetAuthorizationHeader();
-                var result = await _httpClient.GetFromJsonAsync<string>($"api/Task/TaskUpdate?Task={t.intTaskID}&TaskName={t.strTaskName}&Description={t.strDescription}&RequestFrom={t.strRequestFrom}&Priroty={t.intPriroty}&DeadLine={t.dteDeadLine}&USerID={USerID}");
+                var result = await _httpClient.GetFromJsonAsync<string>($"api/Task/TaskUpdate?Task={t.intTaskID}&TaskName={t.strTaskName}&Description={t.strDescription}&RequestFrom={t.strRequestFrom}&Priroty={t.intPriroty}&DeadLine={t.dteDeadLine:yyyy-MM-dd}&USerID={USerID}");
                 return result;
             }
             catch (Exception ex)
@@ -291,6 +292,294 @@ namespace ProjectManagement.Services.TaskM
             catch (Exception ex)
             {
                 return $"Error: {ex.Message}";
+            }
+        }
+
+        // ---- Comments ----
+        public async Task<string> AddComment(int TaskID, int Enroll, string Comment)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var url = $"api/Task/AddComment?TaskID={TaskID}&Enroll={Enroll}&Comment={Uri.EscapeDataString(Comment)}";
+                var result = await _httpClient.GetFromJsonAsync<string>(url);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
+        }
+
+        public async Task<List<TaskComment>> GetComments(int TaskID)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var result = await _httpClient.GetFromJsonAsync<List<TaskComment>>($"api/Task/GetComments?TaskID={TaskID}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        // ---- Attachments ----
+        public async Task<string> UploadAttachment(int TaskID, int Enroll, IBrowserFile File)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                using var content = new MultipartFormDataContent();
+                using var stream = File.OpenReadStream(maxAllowedSize: 25_000_000);
+                using var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(string.IsNullOrEmpty(File.ContentType) ? "application/octet-stream" : File.ContentType);
+                content.Add(fileContent, "File", File.Name);
+
+                var response = await _httpClient.PostAsync($"api/Task/UploadAttachment?TaskID={TaskID}&Enroll={Enroll}", content);
+                return await response.Content.ReadAsStringAsync();
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
+        }
+
+        public async Task<List<TaskAttachment>> GetAttachments(int TaskID)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var result = await _httpClient.GetFromJsonAsync<List<TaskAttachment>>($"api/Task/GetAttachments?TaskID={TaskID}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<string> DeleteAttachment(int AttachmentID, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var result = await _httpClient.GetFromJsonAsync<string>($"api/Task/DeleteAttachment?AttachmentID={AttachmentID}&Enroll={Enroll}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
+        }
+
+        public async Task<byte[]> DownloadAttachment(int TaskID, string FileName)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var response = await _httpClient.GetAsync($"api/Task/DownloadAttachment?TaskID={TaskID}&FileName={Uri.EscapeDataString(FileName)}");
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+                return await response.Content.ReadAsByteArrayAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        // ---- Subtasks ----
+        public async Task<string> CreateSubtask(string Name, string Description, int ParentTaskID, int Priroty, DateOnly DeadLine, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var url = $"api/Task/CreateSubtask?Name={Uri.EscapeDataString(Name)}&Description={Uri.EscapeDataString(Description)}&ParentTaskID={ParentTaskID}&Priroty={Priroty}&DeadLine={DeadLine:yyyy-MM-dd}&Enroll={Enroll}";
+                var result = await _httpClient.GetFromJsonAsync<string>(url);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
+        }
+
+        public async Task<List<SubtaskItem>> GetSubtasks(int ParentTaskID)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var result = await _httpClient.GetFromJsonAsync<List<SubtaskItem>>($"api/Task/GetSubtasks?ParentTaskID={ParentTaskID}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        // ---- Dependencies ----
+        public async Task<List<SubtaskItem>> GetTasksForDependencyPicker(int TaskID)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var result = await _httpClient.GetFromJsonAsync<List<SubtaskItem>>($"api/Task/GetTasksForDependencyPicker?TaskID={TaskID}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<string> AddDependency(int TaskID, int DependsOnTaskID, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var result = await _httpClient.GetFromJsonAsync<string>($"api/Task/AddDependency?TaskID={TaskID}&DependsOnTaskID={DependsOnTaskID}&Enroll={Enroll}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
+        }
+
+        public async Task<string> RemoveDependency(int DependencyID, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var result = await _httpClient.GetFromJsonAsync<string>($"api/Task/RemoveDependency?DependencyID={DependencyID}&Enroll={Enroll}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
+        }
+
+        public async Task<List<TaskDependency>> GetDependencies(int TaskID)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var result = await _httpClient.GetFromJsonAsync<List<TaskDependency>>($"api/Task/GetDependencies?TaskID={TaskID}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        // ---- Teammate task visibility ----
+        public async Task<List<OpenTask>> GetOpenTasksForUser(int UserID)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<List<OpenTask>>($"api/Task/GetOpenTasksForUser?UserID={UserID}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        // ---- Labels ----
+        public async Task<string> CreateLabel(string Name, string Color, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var url = $"api/Task/CreateLabel?Name={Uri.EscapeDataString(Name)}&Color={Uri.EscapeDataString(Color)}&Enroll={Enroll}";
+                return await _httpClient.GetFromJsonAsync<string>(url);
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
+        }
+
+        public async Task<List<TaskLabel>> GetLabels()
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<List<TaskLabel>>("api/Task/GetLabels");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<List<TaskLabel>> GetLabelsByTask(int TaskID)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<List<TaskLabel>>($"api/Task/GetLabelsByTask?TaskID={TaskID}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<string> AssignLabel(int TaskID, int LabelID, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<string>($"api/Task/AssignLabel?TaskID={TaskID}&LabelID={LabelID}&Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
+        }
+
+        public async Task<string> RemoveLabel(int TaskID, int LabelID, int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<string>($"api/Task/RemoveLabel?TaskID={TaskID}&LabelID={LabelID}&Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
+        }
+
+        public async Task<List<Teammate>> GetTeammates(int Enroll)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                return await _httpClient.GetFromJsonAsync<List<Teammate>>($"api/Task/GetTeammates?Enroll={Enroll}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return null;
             }
         }
     }

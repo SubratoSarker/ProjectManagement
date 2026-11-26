@@ -7,8 +7,10 @@ using ProjectManagement.Data;
 using ProjectManagement.Services;
 using ProjectManagement.Services.Admin;
 using ProjectManagement.Services.Auth;
+using ProjectManagement.Services.Dashboard;
 using ProjectManagement.Services.Encription;
 using ProjectManagement.Services.Project;
+using ProjectManagement.Services.Search;
 using ProjectManagement.Services.Session;
 using ProjectManagement.Services.TaskM;
 using System.Text;
@@ -44,6 +46,8 @@ builder.Services.AddHttpClient<IAuthServices, AuthServices>(client => { client.B
 builder.Services.AddHttpClient<IProjectService, ProjectService>(client => { client.BaseAddress = baseAddress; });
 builder.Services.AddHttpClient<IAdminServices, AdminServices>(client => { client.BaseAddress = baseAddress; });
 builder.Services.AddHttpClient<ITaskServices, TaskServices>(client => { client.BaseAddress = baseAddress; });
+builder.Services.AddHttpClient<IDashboardService, DashboardService>(client => { client.BaseAddress = baseAddress; });
+builder.Services.AddHttpClient<ISearchService, SearchService>(client => { client.BaseAddress = baseAddress; });
 
 // Register scoped services
 builder.Services.AddScoped<IEncription, Encription>();

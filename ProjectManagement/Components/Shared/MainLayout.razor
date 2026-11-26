@@ -10,8 +10,12 @@
             TabDefaultUrl="/Home"
             Menus="@Menus" UseTabSet="@UseTabSet" AdditionalAssemblies="new[] { GetType().Assembly }" class="@Theme">
         <Header>
-            <span class="ms-3 flex-sm-fill d-none d-sm-block">Project Management</span>
+            <span class="ms-3 d-none d-sm-block">Project Management</span>
             <div class="flex-fill d-sm-none">
+            </div>
+            <div class="header-search flex-fill d-none d-md-flex justify-content-center">
+                <input class="form-control form-control-sm header-search-input" placeholder="Search..."
+                       @bind="headerSearchQuery" @bind:event="oninput" @onkeyup="OnHeaderSearchKeyUp" />
             </div>
             <Widget></Widget>
             <Logout ImageUrl="image/default.jpg" DisplayName="@DisplayName" UserName="@DisplayAccount">
@@ -110,6 +114,43 @@
                         <span class="cell-label">
                             Show Footer
                         </span>
+                    </div>
+                </div>
+            </GroupBox>
+
+            <GroupBox Title="Theme">
+                <div class="row g-2">
+                    <div class="col-4">
+                        <div class="theme-swatch theme-swatch-professional @(SelectedTheme == "professional" ? "active" : "")"
+                             @onclick="@(() => ChangeTheme("professional"))">Professional</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="theme-swatch theme-swatch-dark @(SelectedTheme == "dark" ? "active" : "")"
+                             @onclick="@(() => ChangeTheme("dark"))">Dark</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="theme-swatch theme-swatch-vibrant @(SelectedTheme == "vibrant" ? "active" : "")"
+                             @onclick="@(() => ChangeTheme("vibrant"))">Vibrant</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="theme-swatch theme-swatch-forest @(SelectedTheme == "forest" ? "active" : "")"
+                             @onclick="@(() => ChangeTheme("forest"))">Forest</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="theme-swatch theme-swatch-sunset @(SelectedTheme == "sunset" ? "active" : "")"
+                             @onclick="@(() => ChangeTheme("sunset"))">Sunset</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="theme-swatch theme-swatch-ocean @(SelectedTheme == "ocean" ? "active" : "")"
+                             @onclick="@(() => ChangeTheme("ocean"))">Ocean</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="theme-swatch theme-swatch-slate @(SelectedTheme == "slate" ? "active" : "")"
+                             @onclick="@(() => ChangeTheme("slate"))">Slate</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="theme-swatch theme-swatch-rose @(SelectedTheme == "rose" ? "active" : "")"
+                             @onclick="@(() => ChangeTheme("rose"))">Rose</div>
                     </div>
                 </div>
             </GroupBox>

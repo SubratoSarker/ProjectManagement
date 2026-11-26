@@ -1,0 +1,348 @@
+@page "/Dashboard"
+@attribute [TabItemOption(Text = "Dashboard")]
+@using ProjectManagement.Models.Dashboard
+@using ProjectManagement.Models.ProjectModel
+@using ProjectManagement.Models.Task
+@using ProjectManagement.Services.Dashboard
+@using ProjectManagement.Services.TaskM
+@using ProjectManagement.Services.Session
+@using System.Text.Json
+@inject IDashboardService dashboard
+@inject ITaskServices task
+@inject Blazored.SessionStorage.ISessionStorageService sess
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Dashboard</PageTitle>
+<h3>Dashboard</h3>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label class="form-label">Project:</label>
+        <select class="form-select" @bind="filterProjectId" @bind:after="OnProjectFilterChanged">
+            <option value="0">-- all projects --</option>
+            @if (Projects != null)
+            {
+                @foreach (var p in Projects.Where(p => p.intProjectID != 0))
+                {
+                    <option value="@p.intProjectID">@p.strProjectName</option>
+                }
+            }
+        </select>
+    </div>
+</div>
+
+@if (Summary != null && Summary.Any())
+{
+    var total = Summary.Sum(s => s.TaskCount);
+    var done = Summary.Where(s => s.strStatus == "Complete").Sum(s => s.TaskCount);
+    var overallPercent = total == 0 ? 0 : (int)Math.Round(100.0 * done / total);
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-2">Overall Progress</h5>
+                <span class="text-muted">@done / @total tasks complete</span>
+            </div>
+            <div class="progress" style="height: 24px;">
+                <div class="progress-bar bg-success" role="progressbar" style="width:@(overallPercent)%;">@overallPercent%</div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header bg-secondary text-black">Workflow Bottlenecks</div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(BottleneckStage))
+                {
+                    <p>
+                        <span class="badge bg-danger">Bottleneck</span>
+                        <strong>@BottleneckStage</strong> has the most tasks piled up right now
+                        (<strong>@BottleneckCount</strong>), relative to the other active stages below.
+                    </p>
+                }
+                else
+                {
+                    <p class="text-muted">No active tasks to analyze yet.</p>
+                }
+                <div id="bottleneckChartDiv" class="pm-chart-surface" style="width: 100%; height: 300px; border-radius: 6px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header bg-secondary text-black">Upcoming Milestones</div>
+            <div class="card-body">
+                @if (Milestones == null || !Milestones.Any())
+                {
+                    <p class="text-muted">No milestones on your projects yet.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-light text-center">
+                                <tr>
+                                    <th>Milestone</th>
+                                    <th>Project</th>
+                                    <th>Date</th>
+                                    <th>Countdown</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var m in Milestones)
+                                {
+                                    var days = m.dteDate.DayNumber - DateOnly.FromDateTime(DateTime.Today).DayNumber;
+                                    <tr class="@(m.isCompleate ? "text-muted text-decoration-line-through" : "")">
+                                        <td>@m.strName</td>
+                                        <td>@m.strProjectName</td>
+                                        <td>@m.dteDate.ToString("dd MMM yyyy")</td>
+                                        <td>
+                                            @if (m.isCompleate)
+                                            {
+                                                <span class="badge bg-success">Done</span>
+                                            }
+                                            else if (days < 0)
+                                            {
+                                                <span class="badge bg-danger">Overdue by @(-days) day@(days != -1 ? "s" : "")</span>
+                                            }
+                                            else if (days == 0)
+                                            {
+                                                <span class="badge bg-warning text-dark">Today</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-info text-dark">In @days day@(days != 1 ? "s" : "")</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-secondary text-black">Tasks by Status</div>
+            <div class="card-body">
+                <div id="statusChartDiv" style="width: 100%; height: 320px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-secondary text-black">Open Tasks per Team Member</div>
+            <div class="card-body">
+                <div id="workloadChartDiv" style="width: 100%; height: 320px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-secondary text-black">Project Progress</div>
+            <div class="card-body">
+                @if (ProjectProgress != null && ProjectProgress.Any())
+                {
+                    @foreach (var p in ProjectProgress)
+                    {
+                        var percent = p.TotalTasks == 0 ? 0 : (int)Math.Round(100.0 * p.DoneTasks / p.TotalTasks);
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>@p.strProjectName</span>
+                                <span class="text-muted">@p.DoneTasks / @p.TotalTasks</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width:@(percent)%;">@percent%</div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-muted">No projects to show.</p>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-danger text-white">Overdue Tasks</div>
+            <div class="card-body">
+                @if (Overdue != null && Overdue.Any())
+                {
+                    @foreach (var group in Overdue.GroupBy(o => o.strProjectName).OrderBy(g => g.Key))
+                    {
+                        <h6 class="mt-2">@group.Key <span class="badge bg-danger">@group.Count()</span></h6>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm table-striped">
+                                <thead class="table-light text-center">
+                                    <tr>
+                                        <th>Task</th>
+                                        <th>Assigned To</th>
+                                        <th>Due</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var o in group.OrderBy(o => o.dteDeadLine))
+                                    {
+                                        <tr>
+                                            <td>@o.strTaskName</td>
+                                            <td>@o.strUserName</td>
+                                            <td class="text-danger">@o.dteDeadLine.ToString("dd MMM yyyy")</td>
+                                            <td>@o.strStatus</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-muted">Nothing overdue. 🎉</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private SessionServices session = new SessionServices();
+    private List<DashboardSummary> Summary;
+    private List<WorkloadItem> Workload;
+    private List<OverdueTask> Overdue;
+    private List<ProjectProgress> ProjectProgress;
+    private List<UpcomingMilestone> Milestones;
+    private List<ProjectPerUser> Projects;
+    private int filterProjectId;
+    private string BottleneckStage;
+    private int BottleneckCount;
+    private List<BottleneckStageData> BottleneckData;
+
+    private record BottleneckStageData(string Stage, int Count);
+
+    protected override async Task OnInitializedAsync()
+    {
+        session = await sess.GetItemAsync<SessionServices>("session");
+        if (session != null)
+        {
+            Projects = await task.GetProjectByUser(session.UserID, 1);
+            Milestones = await dashboard.GetUpcomingMilestones(session.UserID);
+            await LoadFilteredData();
+        }
+    }
+
+    private async Task LoadFilteredData()
+    {
+        Summary = await dashboard.GetSummary(session.UserID, filterProjectId);
+        Workload = await dashboard.GetWorkload(session.UserID, filterProjectId);
+        Overdue = await dashboard.GetOverdue(session.UserID, filterProjectId);
+        ProjectProgress = await dashboard.GetProjectProgress(session.UserID, filterProjectId);
+
+        BottleneckStage = null;
+        BottleneckData = null;
+        if (Summary != null)
+        {
+            // The active pipeline, in the order tasks actually flow through it (see TaskManager.razor's
+            // board: Queue=Pending -> In Progress=Current -> Awaiting Action=OnHold -> Evaluation=Review).
+            // Complete/Removed are excluded -- they've exited the pipeline, not a bottleneck in it.
+            var stageOrder = new[] { "Pending", "Current", "OnHold", "Review" };
+            BottleneckData = stageOrder
+                .Select(name => new BottleneckStageData(name, Summary.FirstOrDefault(s => s.strStatus == name)?.TaskCount ?? 0))
+                .ToList();
+
+            var top = BottleneckData.OrderByDescending(x => x.Count).FirstOrDefault();
+            if (top != null && top.Count > 0)
+            {
+                BottleneckStage = top.Stage;
+                BottleneckCount = top.Count;
+            }
+        }
+    }
+
+    private async Task OnProjectFilterChanged()
+    {
+        await LoadFilteredData();
+        // Unlike the initial load, the chart divs already exist in the DOM from the first render,
+        // so it's safe to redraw them directly here (no render-ordering race to wait out).
+        if (Summary != null && Summary.Any())
+        {
+            await JSRuntime.InvokeVoidAsync("createStatusPieChart", "statusChartDiv", JsonSerializer.Serialize(Summary));
+        }
+        if (Workload != null && Workload.Any())
+        {
+            await JSRuntime.InvokeVoidAsync("createWorkloadBarChart", "workloadChartDiv", JsonSerializer.Serialize(Workload));
+        }
+        if (BottleneckData != null && BottleneckData.Any())
+        {
+            await JSRuntime.InvokeVoidAsync("createBottleneckFunnel", "bottleneckChartDiv", JsonSerializer.Serialize(BottleneckData));
+        }
+    }
+
+    // Deliberately NOT gated on firstRender: OnAfterRenderAsync(firstRender: true) fires after the
+    // FIRST render, which happens before OnInitializedAsync's awaited data finishes loading (Blazor
+    // renders once immediately with default/null fields, then re-renders when the async work completes).
+    // Since firstRender is only ever true once, gating the JS chart calls on it meant they ran every
+    // time with null data and never got a second chance once the data actually arrived. Instead, wait
+    // (across however many renders it takes) until the data has genuinely loaded, then draw exactly once.
+    private bool _chartsAttempted = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_chartsAttempted || Summary == null || Workload == null || BottleneckData == null)
+        {
+            return;
+        }
+        _chartsAttempted = true;
+
+        System.Console.WriteLine($"[Dashboard] Drawing charts: Summary={Summary.Count} rows, Workload={Workload.Count} rows, Bottleneck={BottleneckData.Count} rows");
+
+        if (Summary.Any())
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("createStatusPieChart", "statusChartDiv", JsonSerializer.Serialize(Summary));
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine("[Dashboard] createStatusPieChart JS call failed: " + ex);
+            }
+        }
+        if (Workload.Any())
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("createWorkloadBarChart", "workloadChartDiv", JsonSerializer.Serialize(Workload));
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine("[Dashboard] createWorkloadBarChart JS call failed: " + ex);
+            }
+        }
+        if (BottleneckData.Any())
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("createBottleneckFunnel", "bottleneckChartDiv", JsonSerializer.Serialize(BottleneckData));
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine("[Dashboard] createBottleneckFunnel JS call failed: " + ex);
+            }
+        }
+    }
+}

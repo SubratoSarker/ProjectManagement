@@ -45,6 +45,7 @@
                             <th>Agging</th>
                             <th>Complete</th>
                             <th>Users</th>
+                            <th>Milestones</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -135,6 +136,14 @@
                                             <i class="bi bi-plus"></i>
                                         </button>
                                     }
+                                </td>
+                                <td>
+                                    <button class="btn btn-info rounded" title="Milestones"
+                                    @onclick="() => OpenMilestones(project.IntProjectID)"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#Milestones">
+                                        <i class="bi bi-flag"></i>
+                                    </button>
                                 </td>
                                 <td>
                                     <button class="btn btn-danger rounded" @onclick="() => DeleteProject(project.IntProjectID)">Remove</button>
@@ -234,6 +243,49 @@
         </div>
     </div>
 </div>
+<div class="modal fade fade-in-modal" id="Milestones" tabindex="-1" role="dialog" aria-labelledby="MilestonesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-center">Milestones</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (ProjectMilestones != null && ProjectMilestones.Any())
+                {
+                    <ul class="list-group mb-3">
+                        @foreach (var m in ProjectMilestones)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <input type="checkbox" class="form-check-input me-2" checked="@m.isCompleate" @onchange="() => ToggleMilestone(m.intMilestoneID)" />
+                                    <span class="@(m.isCompleate ? "text-decoration-line-through text-muted" : "")">@m.strName</span>
+                                    <small class="text-muted ms-2">@m.dteDate.ToString("dd MMM yyyy")</small>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteMilestone(m.intMilestoneID)">
+                                    <i class="bi bi-x-circle"></i>
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="text-muted">No milestones yet.</p>
+                }
+                <div class="row mb-2 align-items-center">
+                    <div class="col-7">
+                        <input class="form-control" placeholder="Milestone name" @bind="newMilestoneName" />
+                    </div>
+                    <div class="col-5">
+                        <InputDate @bind-Value="newMilestoneDate" class="form-control" />
+                    </div>
+                </div>
+                <button type="button" class="btn btn-primary mt-1" @onclick="AddMilestone">Add Milestone</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 
 @code {
@@ -246,6 +298,10 @@
     private List<Projects> proj = new List<Projects>();
     public SessionServices session = new SessionServices();
     public List<UserPerProject> UserPerProject = new List<UserPerProject>();
+    private List<Milestone> ProjectMilestones = new List<Milestone>();
+    private int MilestoneProjectID;
+    private string newMilestoneName = string.Empty;
+    private DateOnly newMilestoneDate = DateOnly.FromDateTime(DateTime.Today.AddDays(7));
     private async Task CreateProject()
     {
         bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to create a new project?");
@@ -340,6 +396,46 @@
             proj = await project.GetProjectByTeam(session.TeamID, session.UserID);
             StateHasChanged();
         }
+    }
+
+    private async Task OpenMilestones(int ProjectID)
+    {
+        MilestoneProjectID = ProjectID;
+        newMilestoneName = string.Empty;
+        newMilestoneDate = DateOnly.FromDateTime(DateTime.Today.AddDays(7));
+        ProjectMilestones = await project.GetMilestones(ProjectID);
+        StateHasChanged();
+    }
+
+    private async Task AddMilestone()
+    {
+        if (string.IsNullOrWhiteSpace(newMilestoneName)) { return; }
+        string output = await project.CreateMilestone(MilestoneProjectID, newMilestoneName, newMilestoneDate, session.UserID);
+        if (output != null && output.Contains("Success"))
+        {
+            await Tost.Success("Success", output, true);
+        }
+        else
+        {
+            await Tost.Error("Error", output ?? "Could not create milestone.", true);
+        }
+        newMilestoneName = string.Empty;
+        ProjectMilestones = await project.GetMilestones(MilestoneProjectID);
+        StateHasChanged();
+    }
+
+    private async Task ToggleMilestone(int MilestoneID)
+    {
+        await project.ToggleMilestone(MilestoneID, session.UserID);
+        ProjectMilestones = await project.GetMilestones(MilestoneProjectID);
+        StateHasChanged();
+    }
+
+    private async Task DeleteMilestone(int MilestoneID)
+    {
+        await project.DeleteMilestone(MilestoneID, session.UserID);
+        ProjectMilestones = await project.GetMilestones(MilestoneProjectID);
+        StateHasChanged();
     }
     protected override async Task OnInitializedAsync()
     {

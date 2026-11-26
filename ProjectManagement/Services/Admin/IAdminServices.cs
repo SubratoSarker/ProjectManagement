@@ -14,5 +14,19 @@ namespace ProjectManagement.Services.Admin
         Task<List<PendingTask>> GetPendingTasks(int Enroll);
         Task<List<Performance>> GetPerFormance(DateTime From, DateTime To, int User, int Project);
 
+        // Offboarding / bulk task tooling
+        Task<List<OffboardingUser>> GetAllUsersForOffboarding();
+        Task<List<OpenTask>> GetOpenTasksByUser(int UserID);
+        Task<BulkActionResult> BulkTaskAction(List<int> TaskIDs, int Mode, int TargetUser, int Enroll);
+
+        // Activity log
+        Task<List<ActivityLogEntry>> GetActivityLog(DateTime? From, DateTime? To);
+    }
+
+    public class BulkActionResult
+    {
+        public int SuccessCount { get; set; }
+        public int Total { get; set; }
+        public List<string> Failures { get; set; } = new();
     }
 }

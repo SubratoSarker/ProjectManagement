@@ -1,0 +1,106 @@
+@page "/Timeline"
+@attribute [TabItemOption(Text = "Timeline")]
+@using ProjectManagement.Models.ProjectModel
+@using ProjectManagement.Models.Task
+@using ProjectManagement.Services.Project
+@using ProjectManagement.Services.TaskM
+@using ProjectManagement.Services.Session
+@using System.Text.Json
+@inject IProjectService project
+@inject ITaskServices task
+@inject Blazored.SessionStorage.ISessionStorageService sess
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Timeline</PageTitle>
+<h3>Project Timeline</h3>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label class="form-label">Project:</label>
+        <select class="form-select" @bind="selectedProjectId" @bind:after="OnProjectChanged">
+            <option value="0">-- select a project --</option>
+            @if (Projects != null)
+            {
+                @foreach (var p in Projects.Where(p => p.intProjectID != 0))
+                {
+                    <option value="@p.intProjectID">@p.strProjectName</option>
+                }
+            }
+        </select>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-secondary text-black">Active Tasks (Current / Pending / OnHold / Review)</div>
+    <div class="card-body">
+        @if (selectedProjectId == 0)
+        {
+            <p class="text-muted">Pick a project above to see its timeline.</p>
+        }
+        else if (TimelineData != null && !TimelineData.Any())
+        {
+            <p class="text-muted">No active tasks in this project right now.</p>
+        }
+        else
+        {
+            <div id="ganttChartDiv" style="width: 100%; height: 500px;"></div>
+        }
+    </div>
+</div>
+
+@code {
+    private SessionServices session = new SessionServices();
+    private List<ProjectPerUser> Projects;
+    private int selectedProjectId;
+    private List<TimelineTask> TimelineData;
+    // Set by OnProjectChanged, consumed by OnAfterRenderAsync -- NOT invoked directly from
+    // OnProjectChanged, because at that point the #ganttChartDiv this needs to attach to hasn't
+    // been rendered into the DOM yet (same render-ordering issue the Dashboard charts hit).
+    private List<GanttRow> PendingGanttData;
+
+    private record GanttRow(string Task, long Start, long End);
+
+    protected override async Task OnInitializedAsync()
+    {
+        session = await sess.GetItemAsync<SessionServices>("session");
+        if (session != null)
+        {
+            Projects = await task.GetProjectByUser(session.UserID, 1);
+        }
+    }
+
+    private async Task OnProjectChanged()
+    {
+        if (selectedProjectId == 0)
+        {
+            TimelineData = null;
+            return;
+        }
+        TimelineData = await project.GetTimeline(selectedProjectId);
+        if (TimelineData != null && TimelineData.Any())
+        {
+            PendingGanttData = TimelineData.Select(t => new GanttRow(
+                t.strTaskName,
+                new DateTimeOffset(t.dteStart).ToUnixTimeMilliseconds(),
+                new DateTimeOffset(t.dteEnd.ToDateTime(TimeOnly.MinValue)).ToUnixTimeMilliseconds()
+            )).ToList();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (PendingGanttData != null)
+        {
+            var data = PendingGanttData;
+            PendingGanttData = null;
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("createGanttChart", "ganttChartDiv", JsonSerializer.Serialize(data));
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine("[Timeline] createGanttChart JS call failed: " + ex);
+            }
+        }
+    }
+}

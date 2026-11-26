@@ -1,0 +1,156 @@
+@page "/Search"
+@attribute [TabItemOption(Text = "Search")]
+@using ProjectManagement.Models.Admin
+@using ProjectManagement.Services.Search
+@using ProjectManagement.Services.Session
+@inject ISearchService search
+@inject Blazored.SessionStorage.ISessionStorageService sess
+@inject NavigationManager nav
+
+<PageTitle>Search</PageTitle>
+<h3>Search</h3>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="input-group">
+            <input class="form-control" placeholder="Search tasks, projects, comments, attachments..."
+                   @bind="keyword" @bind:event="oninput" @onkeyup="OnKeyUp" />
+            <button class="btn btn-primary" @onclick="RunSearch"><i class="bi bi-search"></i> Search</button>
+        </div>
+        <small class="text-muted">Type at least 2 characters.</small>
+    </div>
+</div>
+
+@if (searched)
+{
+    if (Results == null)
+    {
+        <p class="text-danger">The search request failed.</p>
+    }
+    else if (!Results.Any())
+    {
+        <p class="text-muted">No results for "@keyword".</p>
+    }
+    else
+    {
+        <p class="text-muted">@Results.Count result@(Results.Count != 1 ? "s" : "") for "@keyword"</p>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead class="table-light text-center">
+                    <tr>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>Snippet</th>
+                        <th>Project</th>
+                        <th>Info</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Results)
+                    {
+                        <tr style="cursor:pointer" @onclick="() => OpenDetail(r)">
+                            <td class="text-center"><span class="badge @BadgeClass(r.ResultType)">@r.ResultType</span></td>
+                            <td>@r.Title</td>
+                            <td>@r.Snippet</td>
+                            <td>@r.ProjectName</td>
+                            <td>@r.ExtraInfo</td>
+                            <td>@r.SortDate.ToString("dd MMM yyyy")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@if (Selected != null)
+{
+    <div class="modal fade show" style="display:block; background-color: rgba(0,0,0,.5);" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@Selected.ResultType: @Selected.Title</h5>
+                    <button type="button" class="btn-close" @onclick="() => Selected = null"></button>
+                </div>
+                <div class="modal-body">
+                    @if (Selected.TaskID.HasValue)
+                    {
+                        <p><span class="fw-bold text-muted">Task ID:</span> @Selected.TaskID</p>
+                    }
+                    @if (!string.IsNullOrEmpty(Selected.ProjectName))
+                    {
+                        <p><span class="fw-bold text-muted">Project:</span> @Selected.ProjectName</p>
+                    }
+                    @if (!string.IsNullOrEmpty(Selected.ExtraInfo))
+                    {
+                        <p><span class="fw-bold text-muted">@(Selected.ResultType == "Task" ? "Status" : "By"):</span> @Selected.ExtraInfo</p>
+                    }
+                    @if (!string.IsNullOrEmpty(Selected.Snippet))
+                    {
+                        <hr />
+                        <p>@Selected.Snippet</p>
+                    }
+                    <p class="text-muted small mb-0">@Selected.SortDate.ToString("dd MMM yyyy, HH:mm")</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => Selected = null">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private SessionServices session = new SessionServices();
+    private string keyword = "";
+    private bool searched;
+    private List<SearchResult> Results;
+    private SearchResult Selected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        session = await sess.GetItemAsync<SessionServices>("session");
+
+        var uri = new Uri(nav.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var q = query.Get("q");
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            keyword = q;
+            await RunSearch();
+        }
+    }
+
+    private async Task OnKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await RunSearch();
+        }
+    }
+
+    private async Task RunSearch()
+    {
+        if (string.IsNullOrWhiteSpace(keyword) || keyword.Trim().Length < 2 || session == null)
+        {
+            return;
+        }
+        searched = true;
+        Results = await search.Global(session.UserID, keyword.Trim());
+    }
+
+    private void OpenDetail(SearchResult r)
+    {
+        Selected = r;
+    }
+
+    private string BadgeClass(string type) => type switch
+    {
+        "Task" => "bg-primary",
+        "Project" => "bg-success",
+        "Comment" => "bg-info text-dark",
+        "Attachment" => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+}
